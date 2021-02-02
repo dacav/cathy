@@ -12,6 +12,7 @@
 typedef struct {
     char *buffer;
     size_t buflen;
+    int errno_save;
 } IORead;
 
 static
@@ -39,6 +40,7 @@ const char *IORead_next(IORead *ioread)
     nread = getdelim(&ioread->buffer, &ioread->buflen, delm, stdin);
 
     if (nread == -1) {
+        ioread->errno_save = errno;
         if (errno)
             warn("getdelim");
         return NULL;
@@ -137,6 +139,8 @@ fail:
 int main(int argc, char **argv)
 {
     IORead ioread;
+    int ex = EXIT_FAILURE;
+
     const char *fname;
 
     IORead_init(&ioread);
@@ -148,10 +152,14 @@ int main(int argc, char **argv)
         hash = file_hash(fname, buffer, sizeof(buffer));
         if (!hash) {
             warnx("skipping %s: could not compute hash", fname);
-            continue;
+            continue;  // TODO - count failure?
         }
 
     }
 
+    if (ioread.errno_save == 0)
+        ex = EXIT_SUCCESS;
+
     IORead_free(&ioread);
+    return ex;
 }
