@@ -1,0 +1,4 @@
+- handle the case of re-scan of output directory
+ - incremental mode
+ - rescan mode
+- test (unlikely) file collision by using mocky cmp program
