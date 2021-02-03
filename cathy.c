@@ -64,11 +64,13 @@ typedef struct {
     size_t hashlen;
 } OutDir;
 
+static
 void OutDir_free(OutDir *outdir)
 {
     free(outdir->buffer);
 }
 
+static
 int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 {
     char *rpath;
@@ -104,6 +106,7 @@ fail:
     return -1;
 }
 
+static
 const char * OutDir_path(OutDir *outdir, const char *hash)
 {
     const size_t hashlen = outdir->hashlen;
