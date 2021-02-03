@@ -128,6 +128,50 @@ enum {
     Hash_buflen = Hash_checksum_length + 1,
 };
 
+static
+int Hash_wait(pid_t child)
+{
+    for (;;) {
+        int w, status;
+
+        w = waitpid(child, &status, WUNTRACED | WCONTINUED);
+        if (w == -1) {
+            warn("waitpid");
+            return -1;
+        }
+
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status);
+        }
+
+        if (WIFSIGNALED(status)) {
+            warnx("subprocess killed by signal %d", WTERMSIG(status));
+            return -1;
+        }
+
+        if (WIFSTOPPED(status))
+            warnx("subprocess stopped by signal %d", WSTOPSIG(status));
+        else if (WIFCONTINUED(status))
+            warnx("subprocess continued");
+    }
+}
+
+static
+void Hash_exec(int r, int w, const char *filename)
+{
+    if (dup2(r, STDIN_FILENO) == -1)
+        err(1, "dup2(%d, %d)", r, STDIN_FILENO);
+    if (close(r) == -1)
+        err(1, "close(%d)", r);
+    if (dup2(w, STDOUT_FILENO) == -1)
+        err(1, "dup2(%d, %d)", w, STDOUT_FILENO);
+    if (close(w) == -1)
+        err(1, "close(%d)", w);
+    execlp("md5sum", "md5sum", filename, NULL);
+    err(1, "execlp");
+}
+
+static
 const char * Hash_file(const char *filename, char *buffer, size_t buflen)
 {
     enum {
@@ -156,16 +200,7 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
             goto fail;
 
         case 0:
-            if (dup2(pipefd[r], STDIN_FILENO) == -1)
-                err(1, "dup2(%d, %d)", pipefd[r], STDIN_FILENO);
-            if (close(pipefd[r]) == -1)
-                err(1, "close(%d)", pipefd[r]);
-            if (dup2(pipefd[w], STDOUT_FILENO) == -1)
-                err(1, "dup2(%d, %d)", pipefd[w], STDOUT_FILENO);
-            if (close(pipefd[w]) == -1)
-                err(1, "close(%d)", pipefd[w]);
-            execlp("md5sum", "md5sum", filename, NULL);
-            err(1, "execlp");
+            Hash_exec(pipefd[r], pipefd[w], filename);
 
         default:
             break;
@@ -189,6 +224,9 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
         goto fail;
     }
 
+    if (Hash_wait(pid))
+        goto fail;
+
     if (close(pipefd[r]) == -1)
         warn("close(%d)", pipefd[r]);
 
@@ -196,8 +234,8 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
     return buffer;
     
 fail:
-    if (pid > 0 && waitpid(pid, NULL, 0) == -1)
-        warn("waitpid(%d, NULL, 0)", pid);
+    if (pid > 0)
+        Hash_wait(pid);
 
     if (pipefd[r] != -1 && close(pipefd[r]) == -1)
         warn("close(%d)", pipefd[r]);
@@ -215,7 +253,7 @@ int main(int argc, char **argv)
 {
     IORead ioread;
     OutDir outdir;
-    int ex = EXIT_FAILURE;
+    int fails = 0;
 
     const char *fname;
 
@@ -233,19 +271,20 @@ int main(int argc, char **argv)
         hash = Hash_file(fname, buffer, sizeof(buffer));
         if (!hash) {
             warnx("skipping %s: could not compute hash", fname);
-            continue;  // TODO - count failure?
+            ++fails;
+            continue;
         }
 
-        printf("fname=%s\n hash=%s\n path=%s\n",
+        printf("fname=%s hash=%s path=%s\n",
             fname, hash, OutDir_path(&outdir, hash)
         );
     }
 
-    if (ioread.errno_save == 0)
-        ex = EXIT_SUCCESS;
+    if (ioread.errno_save)
+        ++fails;
 
 exit:
     OutDir_free(&outdir);
     IORead_free(&ioread);
-    return ex;
+    return fails ? EXIT_FAILURE : EXIT_SUCCESS;
 }
