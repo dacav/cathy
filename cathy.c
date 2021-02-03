@@ -6,6 +6,8 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
 
@@ -59,69 +61,74 @@ enum {
 };
 
 typedef struct {
-    char *buffer;
-    size_t base_path_len;
+    int dirfd;
     size_t hashlen;
 } OutDir;
 
 static
 void OutDir_free(OutDir *outdir)
 {
-    free(outdir->buffer);
+    if (outdir->dirfd != -1 && close(outdir->dirfd))
+        warn("close(%d)", outdir->dirfd);
+}
+
+static
+int OutDir_opendir(int dirfd, const char *path)
+{
+    struct stat statbuf;
+
+    if (fstatat(dirfd, path, &statbuf, 0)) {
+        if (errno != ENOENT) {
+            warn("fstatat(%d, %s, ...)", dirfd, path);
+            return -1;
+        }
+
+        if (mkdirat(dirfd, path, 0777) && errno != EEXIST) {
+            warn("mkdirat(%d, %s, 0777)", dirfd, path);
+            return -1;
+        }
+    }
+
+    return openat(dirfd, path, O_DIRECTORY);
 }
 
 static
 int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 {
-    char *rpath;
-
     *outdir = (OutDir){
+        .dirfd = -1,
         .hashlen = hashlen,
     };
 
-    rpath = realpath(path, NULL);
-    if (!rpath) {
-        warn("realpath(%s, NULL)", path);
+    if ((outdir->dirfd = OutDir_opendir(AT_FDCWD, path)) == -1)
         goto fail;
-    }
-
-    outdir->base_path_len = strlen(rpath);
-
-    /* outdir + '/' + hash[0:N] + '/' + hash[N:] + '\0' */
-    size_t len = outdir->base_path_len + 3 + hashlen;
-
-    outdir->buffer = realloc(rpath, len);
-    if (!outdir->buffer)
-        goto fail;
-    rpath = NULL;
-
-    outdir->buffer[outdir->base_path_len++] = '/';
-    outdir->buffer[outdir->base_path_len] = '\0';
 
     return 0;
 
 fail:
-    free(rpath);
     OutDir_free(outdir);
     return -1;
 }
 
 static
-const char * OutDir_path(OutDir *outdir, const char *hash)
+int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
 {
-    const size_t hashlen = outdir->hashlen;
-    char *buffer = outdir->buffer;
-    int w = outdir->base_path_len;
+    char buffer[OutDir_PREFIX + 1];
+    int dirfd = -1;
+    int e;
 
-    for (int i = 0; i < hashlen && hash[i]; ++i) {
-        if (i == OutDir_PREFIX)
-            buffer[w++] = '/';
-        buffer[w++] = hash[i];
-    }
+    for (size_t i = 0; i < OutDir_PREFIX; ++i)
+        buffer[i] = hash[i];
+    buffer[OutDir_PREFIX] = '\0';
 
-    buffer[w++] = '\0';
+    dirfd = OutDir_opendir(outdir->dirfd, buffer);
+    if (dirfd == -1)
+        return -1;
 
-    return outdir->buffer;
+    e = symlinkat(path, dirfd, hash + OutDir_PREFIX);
+    if (dirfd == -1 && close(dirfd))
+        warn("close(%d)", dirfd);
+    return e;
 }
 
 /* -- Hash ------------------------------------------------------------ */
@@ -258,15 +265,14 @@ int main(int argc, char **argv)
     OutDir outdir;
     int fails = 0;
 
-    const char *fname;
-
-    const char *outdir_path = "./cathy"; // TODO: argv
+    const char *outdir_path = "./cathy.d"; // TODO: argv
 
     IORead_init(&ioread);
 
     if (OutDir_init(&outdir, outdir_path, Hash_checksum_length))
         goto exit;
 
+    const char *fname;
     while (fname = IORead_next(&ioread), fname != NULL) {
         char buffer[Hash_buflen];
         const char *hash;
@@ -278,9 +284,8 @@ int main(int argc, char **argv)
             continue;
         }
 
-        printf("fname=%s hash=%s path=%s\n",
-            fname, hash, OutDir_path(&outdir, hash)
-        );
+        if (OutDir_link(&outdir, hash, fname))
+            ++fails;
     }
 
     if (ioread.errno_save)
