@@ -13,8 +13,11 @@
 
 /* -- miscellaneous --------------------------------------------------- */
 
-static int fdclose(int fd)
+static int fdclose(int *fdptr)
 {
+    int fd = *fdptr;
+    *fdptr = -1;
+
     if (fd != -1 && close(fd)) {
         warn("close(%d)", fd);
         return -1;
@@ -79,7 +82,7 @@ typedef struct {
 static
 void OutDir_free(OutDir *outdir)
 {
-    fdclose(outdir->hashdir);
+    fdclose(&outdir->hashdir);
 }
 
 static
@@ -160,7 +163,7 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
     }
 
 exit:
-    fdclose(dirfd);
+    fdclose(&dirfd);
     return e;
 }
 
@@ -204,11 +207,11 @@ void Hash_exec(int r, int w, const char *filename)
 {
     if (dup2(r, STDIN_FILENO) == -1)
         err(1, "dup2(%d, %d)", r, STDIN_FILENO);
-    if (fdclose(r))
+    if (fdclose(&r))
         exit(EXIT_FAILURE);
     if (dup2(w, STDOUT_FILENO) == -1)
         err(1, "dup2(%d, %d)", w, STDOUT_FILENO);
-    if (fdclose(w) == -1)
+    if (fdclose(&w) == -1)
         exit(EXIT_FAILURE);
     execlp("md5sum", "md5sum", filename, NULL);
     err(1, "execlp");
@@ -249,7 +252,7 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
             break;
     }
 
-    if (fdclose(pipefd[w]) == -1)
+    if (fdclose(&pipefd[w]) == -1)
         goto fail;
     pipefd[w] = -1;
 
@@ -268,7 +271,7 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
     if (Hash_wait(pid))
         goto fail;
 
-    fdclose(pipefd[r]);
+    fdclose(&pipefd[r]);
 
     buffer[nread - 1] = '\0';
     return buffer;
@@ -277,8 +280,8 @@ fail:
     if (pid > 0)
         Hash_wait(pid);
 
-    fdclose(pipefd[r]);
-    fdclose(pipefd[w]);
+    fdclose(&pipefd[r]);
+    fdclose(&pipefd[w]);
     return NULL;
 }
 
