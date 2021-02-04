@@ -11,6 +11,17 @@
 #include <unistd.h>
 #include <limits.h>
 
+/* -- miscellaneous --------------------------------------------------- */
+
+static int fdclose(int fd)
+{
+    if (fd != -1 && close(fd)) {
+        warn("close(%d)", fd);
+        return -1;
+    }
+    return 0;
+}
+
 /* -- IORead ---------------------------------------------------------- */
 
 typedef struct {
@@ -68,8 +79,7 @@ typedef struct {
 static
 void OutDir_free(OutDir *outdir)
 {
-    if (outdir->dirfd != -1 && close(outdir->dirfd))
-        warn("close(%d)", outdir->dirfd);
+    fdclose(outdir->dirfd);
 }
 
 static
@@ -150,8 +160,7 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
     }
 
 exit:
-    if (dirfd != -1 && close(dirfd))
-        warn("close(%d)", dirfd);
+    fdclose(dirfd);
     return e;
 }
 
@@ -195,12 +204,12 @@ void Hash_exec(int r, int w, const char *filename)
 {
     if (dup2(r, STDIN_FILENO) == -1)
         err(1, "dup2(%d, %d)", r, STDIN_FILENO);
-    if (close(r) == -1)
-        err(1, "close(%d)", r);
+    if (fdclose(r))
+        exit(EXIT_FAILURE);
     if (dup2(w, STDOUT_FILENO) == -1)
         err(1, "dup2(%d, %d)", w, STDOUT_FILENO);
-    if (close(w) == -1)
-        err(1, "close(%d)", w);
+    if (fdclose(w) == -1)
+        exit(EXIT_FAILURE);
     execlp("md5sum", "md5sum", filename, NULL);
     err(1, "execlp");
 }
@@ -240,10 +249,8 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
             break;
     }
 
-    if (close(pipefd[w]) == -1) {
-        warnx("close(%d)", pipefd[w]);
+    if (fdclose(pipefd[w]) == -1)
         goto fail;
-    }
     pipefd[w] = -1;
 
     nread = read(pipefd[r], buffer, buflen);
@@ -261,8 +268,7 @@ const char * Hash_file(const char *filename, char *buffer, size_t buflen)
     if (Hash_wait(pid))
         goto fail;
 
-    if (close(pipefd[r]) == -1)
-        warn("close(%d)", pipefd[r]);
+    fdclose(pipefd[r]);
 
     buffer[nread - 1] = '\0';
     return buffer;
@@ -271,12 +277,8 @@ fail:
     if (pid > 0)
         Hash_wait(pid);
 
-    if (pipefd[r] != -1 && close(pipefd[r]) == -1)
-        warn("close(%d)", pipefd[r]);
-
-    if (pipefd[w] != -1 && close(pipefd[w]) == -1)
-        warn("close(%d)", pipefd[w]);
-
+    fdclose(pipefd[r]);
+    fdclose(pipefd[w]);
     return NULL;
 }
 
