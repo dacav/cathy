@@ -16,7 +16,7 @@
 typedef struct {
     char *buffer;
     size_t buflen;
-    int errno_save;
+    int errno_s;
 } IORead;
 
 static
@@ -44,7 +44,7 @@ const char *IORead_next(IORead *ioread)
     nread = getdelim(&ioread->buffer, &ioread->buflen, delm, stdin);
 
     if (nread == -1) {
-        ioread->errno_save = errno;
+        ioread->errno_s = errno;
         if (errno)
             warn("getdelim");
         return NULL;
@@ -314,7 +314,7 @@ int main(int argc, char **argv)
             ++fails;
     }
 
-    if (ioread.errno_save)
+    if (ioread.errno_s)
         ++fails;
 
 exit:
