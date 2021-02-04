@@ -111,11 +111,20 @@ fail:
 }
 
 static
+int OutDir_handle_dup(const OutDir *outdir, const char *target, int dirfd,
+                      const char *linkname)
+{
+    warnx("DUPLICATE %s %s", target, linkname);
+}
+
+static
 int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
 {
     char buffer[OutDir_PREFIX + 1];
+    char target[PATH_MAX];
+    const char *linkname;
     int dirfd = -1;
-    int e;
+    int e = -1;
 
     for (size_t i = 0; i < OutDir_PREFIX; ++i)
         buffer[i] = hash[i];
@@ -123,10 +132,25 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
 
     dirfd = OutDir_opendir(outdir->dirfd, buffer);
     if (dirfd == -1)
-        return -1;
+        goto exit;
 
-    e = symlinkat(path, dirfd, hash + OutDir_PREFIX);
-    if (dirfd == -1 && close(dirfd))
+    if (!realpath(path, target)) {
+        warn("realpath(%s, ...)", path);
+        goto exit;
+    }
+
+    linkname = hash + OutDir_PREFIX;
+
+    e = symlinkat(target, dirfd, linkname);
+    if (e) {
+        if (errno == EEXIST)
+            e = OutDir_handle_dup(outdir, target, dirfd, linkname);
+        else
+            warn("symlink(%s, %s/%s)", target, buffer, linkname);
+    }
+
+exit:
+    if (dirfd != -1 && close(dirfd))
         warn("close(%d)", dirfd);
     return e;
 }
