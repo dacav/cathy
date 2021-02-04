@@ -72,14 +72,14 @@ enum {
 };
 
 typedef struct {
-    int dirfd;
+    int hashdir;
     size_t hashlen;
 } OutDir;
 
 static
 void OutDir_free(OutDir *outdir)
 {
-    fdclose(outdir->dirfd);
+    fdclose(outdir->hashdir);
 }
 
 static
@@ -106,11 +106,11 @@ static
 int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 {
     *outdir = (OutDir){
-        .dirfd = -1,
+        .hashdir = -1,
         .hashlen = hashlen,
     };
 
-    if ((outdir->dirfd = OutDir_opendir(AT_FDCWD, path)) == -1)
+    if ((outdir->hashdir = OutDir_opendir(AT_FDCWD, path)) == -1)
         goto fail;
 
     return 0;
@@ -140,7 +140,7 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
         buffer[i] = hash[i];
     buffer[OutDir_PREFIX] = '\0';
 
-    dirfd = OutDir_opendir(outdir->dirfd, buffer);
+    dirfd = OutDir_opendir(outdir->hashdir, buffer);
     if (dirfd == -1)
         goto exit;
 
