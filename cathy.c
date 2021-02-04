@@ -108,18 +108,27 @@ int OutDir_opendir(int dirfd, const char *path)
 static
 int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 {
+    int basedir;
+
     *outdir = (OutDir){
         .hashdir = -1,
         .hashlen = hashlen,
     };
 
-    if ((outdir->hashdir = OutDir_opendir(AT_FDCWD, path)) == -1)
+    basedir = OutDir_opendir(AT_FDCWD, path);
+    if (basedir == -1)
         goto fail;
 
+    outdir->hashdir = OutDir_opendir(basedir, "by-hash");
+    if (outdir->hashdir == -1)
+        goto fail;
+
+    fdclose(&basedir);
     return 0;
 
 fail:
     OutDir_free(outdir);
+    fdclose(&basedir);
     return -1;
 }
 
