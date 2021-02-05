@@ -76,7 +76,6 @@ enum {
 
 typedef struct {
     int hashdir;
-    int dupdir;
     size_t hashlen;
 } OutDir;
 
@@ -104,7 +103,6 @@ int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 
     *outdir = (OutDir){
         .hashdir = -1,
-        .dupdir = -1,
         .hashlen = hashlen,
     };
 
@@ -114,10 +112,6 @@ int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 
     outdir->hashdir = OutDir_opendir(basedir, "by-hash");
     if (outdir->hashdir == -1)
-        goto fail;
-
-    outdir->dupdir = OutDir_opendir(basedir, "duplicates");
-    if (outdir->dupdir == -1)
         goto fail;
 
     fdclose(&basedir);
