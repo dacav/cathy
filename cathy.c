@@ -76,6 +76,7 @@ enum {
 
 typedef struct {
     int hashdir;
+    int dupdir;
     size_t hashlen;
 } OutDir;
 
@@ -83,6 +84,7 @@ static
 void OutDir_free(OutDir *outdir)
 {
     fdclose(&outdir->hashdir);
+    fdclose(&outdir->dupdir);
 }
 
 static
@@ -112,6 +114,7 @@ int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 
     *outdir = (OutDir){
         .hashdir = -1,
+        .dupdir = -1,
         .hashlen = hashlen,
     };
 
@@ -121,6 +124,10 @@ int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
 
     outdir->hashdir = OutDir_opendir(basedir, "by-hash");
     if (outdir->hashdir == -1)
+        goto fail;
+
+    outdir->dupdir = OutDir_opendir(basedir, "duplicates");
+    if (outdir->dupdir == -1)
         goto fail;
 
     fdclose(&basedir);
@@ -133,10 +140,26 @@ fail:
 }
 
 static
-int OutDir_handle_dup(const OutDir *outdir, const char *target, int dirfd,
+int OutDir_handle_dup(const OutDir *outdir,
+                      const char *target,
+                      int dirfd,
                       const char *linkname)
 {
-    warnx("DUPLICATE %s %s", target, linkname);
+    char filename[PATH_MAX];
+    ssize_t len;
+
+    len = readlinkat(dirfd, linkname, filename, sizeof(filename));
+    if (len == -1) {
+        warn("readlinkat(%d, %s, ...)", dirfd, linkname);
+        return -1;
+    }
+    if (len == sizeof(filename)) {
+        warnx("readlinkat(%d, %s, ...) truncated", dirfd, linkname);
+        return -1;
+    }
+    filename[len] = '\0';
+
+    warnx("DUPLICATE %s %s", target, filename);
 }
 
 static
