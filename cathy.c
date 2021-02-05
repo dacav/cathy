@@ -84,24 +84,14 @@ static
 void OutDir_free(OutDir *outdir)
 {
     fdclose(&outdir->hashdir);
-    fdclose(&outdir->dupdir);
 }
 
 static
 int OutDir_opendir(int dirfd, const char *path)
 {
-    struct stat statbuf;
-
-    if (fstatat(dirfd, path, &statbuf, 0)) {
-        if (errno != ENOENT) {
-            warn("fstatat(%d, %s, ...)", dirfd, path);
-            return -1;
-        }
-
-        if (mkdirat(dirfd, path, 0777) && errno != EEXIST) {
-            warn("mkdirat(%d, %s, 0777)", dirfd, path);
-            return -1;
-        }
+    if (mkdirat(dirfd, path, 0777) && errno != EEXIST) {
+        warn("mkdirat(%d, %s, 0777)", dirfd, path);
+        return -1;
     }
 
     return openat(dirfd, path, O_DIRECTORY);
