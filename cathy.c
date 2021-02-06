@@ -1,3 +1,4 @@
+#include <dirent.h>
 #include <err.h>
 #include <errno.h>
 #include <stdio.h>
@@ -86,14 +87,13 @@ void OutDir_free(OutDir *outdir)
 }
 
 static
-int OutDir_opendir(int dirfd, const char *path)
+int OutDir_mkdir(int dirfd, const char *path)
 {
     if (mkdirat(dirfd, path, 0777) && errno != EEXIST) {
         warn("mkdirat(%d, %s, 0777)", dirfd, path);
         return -1;
     }
-
-    return openat(dirfd, path, O_DIRECTORY);
+    return 0;
 }
 
 static
@@ -106,11 +106,17 @@ int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
         .hashlen = hashlen,
     };
 
-    basedir = OutDir_opendir(AT_FDCWD, path);
+    if (OutDir_mkdir(AT_FDCWD, path) == -1)
+        goto fail;
+
+    basedir = openat(AT_FDCWD, path, O_DIRECTORY);
     if (basedir == -1)
         goto fail;
 
-    outdir->hashdir = OutDir_opendir(basedir, "by-hash");
+    if (OutDir_mkdir(basedir, "by-hash") == -1)
+        goto fail;
+
+    outdir->hashdir = openat(basedir, "by-hash", O_DIRECTORY);
     if (outdir->hashdir == -1)
         goto fail;
 
@@ -124,63 +130,121 @@ fail:
 }
 
 static
-int OutDir_handle_dup(const OutDir *outdir,
-                      const char *target,
-                      int dirfd,
-                      const char *linkname)
+int OutDir_readlink(char *dst,
+                    size_t dstlen,
+                    int dirfd,
+                    const char *linkname)
 {
-    char filename[PATH_MAX];
     ssize_t len;
 
-    len = readlinkat(dirfd, linkname, filename, sizeof(filename));
+    len = readlinkat(dirfd, linkname, dst, dstlen);
     if (len == -1) {
         warn("readlinkat(%d, %s, ...)", dirfd, linkname);
         return -1;
     }
-    if (len == sizeof(filename)) {
+    if (len == dstlen) {
         warnx("readlinkat(%d, %s, ...) truncated", dirfd, linkname);
         return -1;
     }
-    filename[len] = '\0';
+    dst[len] = '\0';
+    return 0;
+}
 
-    warnx("DUPLICATE %s %s", target, filename);
+static
+int OutDir_hash_path(const OutDir *outdir, const char *hash, const char *path)
+{
+    char buffer[PATH_MAX];
+    size_t hashlen;
+    int dirfd;
+
+    hashlen = strlen(hash);
+    if (hashlen < OutDir_PREFIX || hashlen > sizeof(buffer) - 1) {
+        warnx("hash for '%s' has unexpected length, %zu bytes", hashlen);
+        return -1;
+    }
+
+    memcpy(buffer, hash, OutDir_PREFIX);
+    buffer[OutDir_PREFIX] = '\0';
+    if (OutDir_mkdir(outdir->hashdir, buffer))
+        return -1;
+
+    buffer[OutDir_PREFIX] = '/';
+    memcpy(buffer + OutDir_PREFIX + 1,
+           hash + OutDir_PREFIX,
+           hashlen - OutDir_PREFIX - 1);
+    buffer[hashlen] = '\0';
+    if (OutDir_mkdir(outdir->hashdir, buffer))
+        return -1;
+
+    dirfd = openat(outdir->hashdir, buffer, O_DIRECTORY);
+    if (dirfd == -1)
+        warn("openat(%s, %s, O_DIRECTORY)", outdir->hashdir, buffer);
+    return dirfd;
+}
+
+static
+int OutDir_count_links(int dirfd)
+{
+    DIR *dir;
+    struct dirent *entry;
+    int result = 0;
+
+    dirfd = dup(dirfd);
+    if (dirfd == -1) {
+        warn("dup");
+        return -1;
+    }
+
+    dir = fdopendir(dirfd);
+    if (!dir) {
+        warn("fdopendir");
+        fdclose(&dirfd);
+        return -1;
+    }
+
+    while (errno = 0, entry = readdir(dir))
+        if (entry->d_type == DT_LNK)
+            ++result;
+
+    if (errno) {
+        warn("readdir");
+        result = -1;
+    }
+    closedir(dir);
+
+    return result;
 }
 
 static
 int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
 {
-    char buffer[OutDir_PREFIX + 1];
-    char target[PATH_MAX];
-    const char *linkname;
-    int dirfd = -1;
-    int e = -1;
+    int dirfd = -1,
+        ex = -1,
+        links_count;
+    char linkname[4];
+    char abspath[PATH_MAX];
 
-    for (size_t i = 0; i < OutDir_PREFIX; ++i)
-        buffer[i] = hash[i];
-    buffer[OutDir_PREFIX] = '\0';
-
-    dirfd = OutDir_opendir(outdir->hashdir, buffer);
+    dirfd = OutDir_hash_path(outdir, hash, path);
     if (dirfd == -1)
         goto exit;
 
-    if (!realpath(path, target)) {
+    links_count = OutDir_count_links(dirfd);
+    if (links_count == -1)
+        goto exit;
+
+    if (realpath(path, abspath) == NULL) {
         warn("realpath(%s, ...)", path);
         goto exit;
     }
 
-    linkname = hash + OutDir_PREFIX;
-
-    e = symlinkat(target, dirfd, linkname);
-    if (e) {
-        if (errno == EEXIST)
-            e = OutDir_handle_dup(outdir, target, dirfd, linkname);
-        else
-            warn("symlink(%s, %s/%s)", target, buffer, linkname);
-    }
-
+    snprintf(linkname, sizeof(linkname), "%03d", links_count);
+    if (symlinkat(abspath, dirfd, linkname))
+        warn("symlinkat(%s, %d, %s)", path, dirfd, linkname);
+    else
+        ex = 0;
 exit:
     fdclose(&dirfd);
-    return e;
+    return ex;
 }
 
 /* -- Hash ------------------------------------------------------------ */
