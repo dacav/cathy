@@ -123,7 +123,8 @@ int OutDir_count_links(int dirfd)
         warn("readdir");
         result = -1;
     }
-    closedir(dir);
+    if (closedir(dir))
+        warn("closedir");
 
     return result;
 }
