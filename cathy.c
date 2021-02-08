@@ -23,11 +23,18 @@ int main(int argc, char **argv)
 {
     IORead ioread;
     OutDir outdir;
+    Hash hash;
     int fails = 0;
 
     const char *outdir_path = "./cathy.d"; // TODO: argv
+    const char *hashprg = "md5sum";
 
     IORead_init(&ioread);
+
+    if (Hash_init(&hash, hashprg)) {
+        ++fails;
+        goto exit;
+    }
 
     if (OutDir_init(&outdir, outdir_path)) {
         ++fails;
@@ -36,17 +43,16 @@ int main(int argc, char **argv)
 
     const char *fname;
     while (fname = IORead_next(&ioread), fname != NULL) {
-        char buffer[Hash_buflen];
-        const char *hash;
+        const char *filehash;
 
-        hash = Hash_file(fname, buffer, sizeof(buffer));
-        if (!hash) {
+        filehash = Hash_file(&hash, fname);
+        if (!filehash) {
             warnx("skipping %s: could not compute hash", fname);
             ++fails;
             continue;
         }
 
-        if (OutDir_link(&outdir, hash, fname))
+        if (OutDir_link(&outdir, filehash, fname))
             ++fails;
     }
 

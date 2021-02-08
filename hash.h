@@ -1,6 +1,10 @@
-enum {
-    Hash_checksum_length = 32,
-    Hash_buflen = Hash_checksum_length + 1,
-};
+typedef struct {
+    const char *hashprg;
+    char *buffer;
+} Hash;
 
-const char * Hash_file(const char *filename, char *buffer, size_t buflen);
+int Hash_init(Hash *hash, const char *hashprg);
+
+const char * Hash_file(Hash *hash, const char *filename);
+
+void Hash_free(Hash *hash);
