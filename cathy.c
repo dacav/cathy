@@ -130,27 +130,6 @@ fail:
 }
 
 static
-int OutDir_readlink(char *dst,
-                    size_t dstlen,
-                    int dirfd,
-                    const char *linkname)
-{
-    ssize_t len;
-
-    len = readlinkat(dirfd, linkname, dst, dstlen);
-    if (len == -1) {
-        warn("readlinkat(%d, %s, ...)", dirfd, linkname);
-        return -1;
-    }
-    if (len == dstlen) {
-        warnx("readlinkat(%d, %s, ...) truncated", dirfd, linkname);
-        return -1;
-    }
-    dst[len] = '\0';
-    return 0;
-}
-
-static
 int OutDir_hash_path(const OutDir *outdir, const char *hash, const char *path)
 {
     char buffer[PATH_MAX];
@@ -159,7 +138,7 @@ int OutDir_hash_path(const OutDir *outdir, const char *hash, const char *path)
 
     hashlen = strlen(hash);
     if (hashlen < OutDir_PREFIX || hashlen > sizeof(buffer) - 1) {
-        warnx("hash for '%s' has unexpected length, %zu bytes", hashlen);
+        warnx("hash for '%s' has unexpected length, %zu bytes", path, hashlen);
         return -1;
     }
 
@@ -178,7 +157,7 @@ int OutDir_hash_path(const OutDir *outdir, const char *hash, const char *path)
 
     dirfd = openat(outdir->hashdir, buffer, O_DIRECTORY);
     if (dirfd == -1)
-        warn("openat(%s, %s, O_DIRECTORY)", outdir->hashdir, buffer);
+        warn("openat(%d, %s, O_DIRECTORY)", outdir->hashdir, buffer);
     return dirfd;
 }
 
