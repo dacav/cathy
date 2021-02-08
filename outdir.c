@@ -14,7 +14,7 @@
 #include "util.h"
 
 enum {
-    OutDir_PREFIX = 3,
+    OutDir_PREFIX = 5,
 };
 
 void OutDir_free(OutDir *outdir)
@@ -134,7 +134,7 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
     int dirfd = -1,
         ex = -1,
         links_count;
-    char linkname[4];
+    char linkname[OutDir_PREFIX];
     char abspath[PATH_MAX];
 
     dirfd = OutDir_hash_path(outdir, hash, path);
@@ -150,7 +150,7 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
         goto exit;
     }
 
-    snprintf(linkname, sizeof(linkname), "%03d", links_count);
+    snprintf(linkname, sizeof(linkname), "%*.*d", 0, (int)sizeof(linkname) - 1, links_count);
     if (symlinkat(abspath, dirfd, linkname))
         warn("symlinkat(%s, %d, %s)", path, dirfd, linkname);
     else
