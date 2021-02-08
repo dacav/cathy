@@ -32,13 +32,12 @@ int OutDir_mkdir(int dirfd, const char *path)
     return 0;
 }
 
-int OutDir_init(OutDir *outdir, const char *path, size_t hashlen)
+int OutDir_init(OutDir *outdir, const char *path)
 {
     int basedir;
 
     *outdir = (OutDir){
         .hashdir = -1,
-        .hashlen = hashlen,
     };
 
     if (OutDir_mkdir(AT_FDCWD, path) == -1)

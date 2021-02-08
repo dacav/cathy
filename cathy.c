@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 
     IORead_init(&ioread);
 
-    if (OutDir_init(&outdir, outdir_path, Hash_checksum_length)) {
+    if (OutDir_init(&outdir, outdir_path)) {
         ++fails;
         goto exit;
     }
