@@ -86,7 +86,7 @@ int Hash_wait(pid_t child)
 }
 
 static
-void Hash_exec(const char *hashprg, int r, int w, const char *filename)
+void Hash_exec(const char * const hashprg, int r, int w, const char *filename)
 {
     if (dup2(r, STDIN_FILENO) == -1)
         err(1, "dup2(%d, %d)", r, STDIN_FILENO);
@@ -101,7 +101,7 @@ void Hash_exec(const char *hashprg, int r, int w, const char *filename)
 }
 
 static
-int Hash_read(Hash *hash, int r)
+int Hash_read(const Hash *hash, int r)
 {
     ssize_t n;
     char *buffer;
@@ -133,7 +133,7 @@ int Hash_read(Hash *hash, int r)
     return -1;
 }
 
-const char * Hash_file(Hash *hash, const char *filename)
+const char * Hash_file(const Hash *hash, const char *filename)
 {
     enum {
         r = 0,
