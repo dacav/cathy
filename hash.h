@@ -1,3 +1,5 @@
+#pragma once
+
 typedef struct {
     const char *hashprg;
     char *buffer;
