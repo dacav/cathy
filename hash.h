@@ -1,12 +1,9 @@
 #pragma once
 
-typedef struct {
-    const char *hashprg;
-    char *buffer;
-} Hash;
+typedef struct Hash Hash;
 
-int Hash_init(Hash *hash, const char *hashprg);
+Hash *Hash_new(const char *hashprg);
 
 const char * Hash_file(Hash *hash, const char *filename);
 
-void Hash_free(Hash *hash);
+void Hash_del(Hash *hash);

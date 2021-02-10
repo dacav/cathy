@@ -12,7 +12,7 @@ int main(int argc, char **argv)
 {
     IORead ioread;
     OutDir outdir;
-    Hash hash;
+    Hash *hash;
     int fails = 0;
 
     const char *outdir_path = "./cathy.d"; // TODO: argv
@@ -20,7 +20,8 @@ int main(int argc, char **argv)
 
     IORead_init(&ioread);
 
-    if (Hash_init(&hash, hashprg)) {
+    hash = Hash_new(hashprg);
+    if (!hash) {
         ++fails;
         goto exit;
     }
@@ -34,7 +35,7 @@ int main(int argc, char **argv)
     while (fname = IORead_next(&ioread), fname != NULL) {
         const char *filehash;
 
-        filehash = Hash_file(&hash, fname);
+        filehash = Hash_file(hash, fname);
         if (!filehash) {
             warnx("skipping %s: could not compute hash", fname);
             ++fails;
@@ -50,6 +51,7 @@ int main(int argc, char **argv)
 
 exit:
     OutDir_free(&outdir);
+    Hash_del(hash);
     IORead_free(&ioread);
     return fails ? EXIT_FAILURE : EXIT_SUCCESS;
 }

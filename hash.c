@@ -9,19 +9,33 @@
 #include "util.h"
 #include "hash.h"
 
+struct Hash {
+    const char *hashprg;
+    char *buffer;
+};
+
 enum {
     Hash_checksum_length = 128, // ok for anything up to sha512
     Hash_buflen = Hash_checksum_length + 1,
 };
 
-void Hash_free(Hash *hash)
+void Hash_del(Hash *hash)
 {
+    if (!hash)
+        return;
+
     free((void *)hash->hashprg);
     free((void *)hash->buffer);
+    free(hash);
 }
 
-int Hash_init(Hash *hash, const char *hashprg)
+Hash *Hash_new(const char *hashprg)
 {
+    Hash *hash = malloc(sizeof(Hash));
+    if (!hash) {
+        warn("malloc");
+        goto fail;
+    }
     *hash = (Hash){};
 
     hash->hashprg = strdup(hashprg);
@@ -36,11 +50,11 @@ int Hash_init(Hash *hash, const char *hashprg)
         goto fail;
     }
 
-    return 0;
+    return hash;
 
 fail:
-    Hash_free(hash);
-    return -1;
+    Hash_del(hash);
+    return NULL;
 }
 
 static
