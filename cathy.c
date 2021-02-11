@@ -5,7 +5,6 @@
 #include "hash.h"
 #include "ioread.h"
 #include "outdir.h"
-#include "util.h"
 
 /* -- main ------------------------------------------------------------ */
 
