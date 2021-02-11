@@ -1,6 +1,7 @@
 #include <err.h>
 #include <stdlib.h>
 
+#include "filerepo.h"
 #include "hash.h"
 #include "ioread.h"
 #include "outdir.h"
@@ -11,8 +12,9 @@
 int main(int argc, char **argv)
 {
     IORead ioread;
-    OutDir outdir;
     Hash *hash;
+    FileRepo *filerepo;
+    OutDir outdir;
     int fails = 0;
 
     const char *outdir_path = "./cathy.d"; // TODO: argv
@@ -26,31 +28,30 @@ int main(int argc, char **argv)
         goto exit;
     }
 
+    filerepo = FileRepo_new(hash);
+    if (!filerepo) {
+        ++fails;
+        goto exit;
+    }
+
     if (OutDir_init(&outdir, outdir_path)) {
         ++fails;
         goto exit;
     }
 
     const char *fname;
-    while (fname = IORead_next(&ioread), fname != NULL) {
-        const char *filehash;
-
-        filehash = Hash_file(hash, fname);
-        if (!filehash) {
-            warnx("skipping %s: could not compute hash", fname);
+    while (fname = IORead_next(&ioread), fname != NULL)
+        if (FileRepo_add(filerepo, fname) == NULL) {
+            warnx("failure handling %s", fname);
             ++fails;
-            continue;
         }
-
-        if (OutDir_link(&outdir, filehash, fname))
-            ++fails;
-    }
 
     if (ioread.errno_s)
         ++fails;
 
 exit:
     OutDir_free(&outdir);
+    FileRepo_del(filerepo);
     Hash_del(hash);
     IORead_free(&ioread);
     return fails ? EXIT_FAILURE : EXIT_SUCCESS;
