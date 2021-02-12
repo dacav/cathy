@@ -5,9 +5,7 @@
 typedef struct File {
     const char *path;
     const char *hash;
-
-    /* Optional fields, populated on request */
-    time_t timestamp;
+    time_t mtime;
 } File;
 
 int File_init(File *, const char *path, const char *hash);
