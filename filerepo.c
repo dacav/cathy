@@ -17,6 +17,7 @@ typedef struct PFile {
 
 typedef struct {
     PFile *pfile;
+    time_t min_mtime;
     UT_hash_handle hh;
 } Record;
 
@@ -68,16 +69,31 @@ fail:
 }
 
 static
-int FileRepo_attach(FileRepo *filerepo, PFile *pfile)
+int FileRepo_attach_pfile(Record *record, PFile *pfile)
+{
+    pfile->collisions.next = record->pfile;
+    record->pfile = pfile;
+
+    if (pfile->file.mtime != record->min_mtime) {
+        warnx("mtime discrepancy for hash '%s', taking smaller value",
+            pfile->file.hash
+        );
+
+        if (pfile->file.mtime < record->min_mtime)
+            record->min_mtime = pfile->file.mtime;
+    }
+
+    return 0;
+}
+
+static
+int FileRepo_attach_record(FileRepo *filerepo, PFile *pfile)
 {
     Record *record;
 
     HASH_FIND_STR(filerepo->records, pfile->file.hash, record);
-    if (record) {
-        pfile->collisions.next = record->pfile;
-        record->pfile = pfile;
-        return 0;
-    }
+    if (record)
+        return FileRepo_attach_pfile(record, pfile);
 
     record = malloc(sizeof(Record));
     if (!record) {
@@ -87,6 +103,7 @@ int FileRepo_attach(FileRepo *filerepo, PFile *pfile)
 
     *record = (Record){
         .pfile = pfile,
+        .min_mtime = pfile->file.mtime,
     };
 
     HASH_ADD_KEYPTR(
@@ -120,7 +137,7 @@ File *FileRepo_add(FileRepo *filerepo, const char *path)
         goto fail;
     fileinit = true;
 
-    if (FileRepo_attach(filerepo, pfile))
+    if (FileRepo_attach_record(filerepo, pfile))
         goto fail;
 
     return &pfile->file;
