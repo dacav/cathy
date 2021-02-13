@@ -132,7 +132,7 @@ int Hasher_read(const Hasher *hasher, int r)
     return -1;
 }
 
-const char * Hasher_file(const Hasher *hasher, const char *filename)
+const char * Hasher_hash_file(const Hasher *hasher, const char *filename)
 {
     enum {
         r = 0,

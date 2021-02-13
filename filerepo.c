@@ -129,7 +129,7 @@ File *FileRepo_add(FileRepo *filerepo, const char *path)
     }
     *pfile = (PFile){};
 
-    filehash = Hasher_file(filerepo->hasher, path);
+    filehash = Hasher_hash_file(filerepo->hasher, path);
     if (!filehash)
         goto fail;
 
