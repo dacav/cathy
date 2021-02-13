@@ -13,17 +13,29 @@ typedef struct PFile {
     struct {
         struct PFile *next;
     } collisions;
-    UT_hash_handle hh;
 } PFile;
 
+typedef struct {
+    PFile *pfile;
+    UT_hash_handle hh;
+} Record;
+
 struct FileRepo {
-    PFile *files;
+    Record *records;
     const Hash *hasher;
 };
 
 static
-void PFile_del(PFile *pfile)
+void Record_del(Record *record)
 {
+    PFile *pfile;
+
+    if (!record)
+        return;
+
+    pfile = record->pfile;
+    free(record);
+
     while (pfile) {
         PFile *next;
 
@@ -58,23 +70,31 @@ fail:
 static
 int FileRepo_attach(FileRepo *filerepo, PFile *pfile)
 {
-    PFile *aux;
+    Record *record;
 
-    HASH_FIND_STR(filerepo->files, pfile->file.hash, aux);
-    if (aux) {
-        debug("seen hash %s (file %s)", pfile->file.hash, pfile->file.path);
-        pfile->collisions.next = aux->collisions.next;
-        aux->collisions.next = pfile;
+    HASH_FIND_STR(filerepo->records, pfile->file.hash, record);
+    if (record) {
+        pfile->collisions.next = record->pfile;
+        record->pfile = pfile;
         return 0;
     }
 
-    debug("unseen hash %s (file %s)", pfile->file.hash, pfile->file.path);
+    record = malloc(sizeof(Record));
+    if (!record) {
+        warn("malloc");
+        return -1;
+    }
+
+    *record = (Record){
+        .pfile = pfile,
+    };
+
     HASH_ADD_KEYPTR(
         hh,
-        filerepo->files,
+        filerepo->records,
         pfile->file.hash,
         strlen(pfile->file.hash),
-        pfile);
+        record);
 
     return 0;
 }
@@ -114,14 +134,14 @@ fail:
 
 void FileRepo_del(FileRepo *filerepo)
 {
-    PFile *pf, *tmp;
+    Record *record, *tmp;
 
     if (!filerepo)
         return;
 
-    HASH_ITER(hh, filerepo->files, pf, tmp) {
-        HASH_DEL(filerepo->files, pf);
-        PFile_del(pf);
+    HASH_ITER(hh, filerepo->records, record, tmp) {
+        HASH_DEL(filerepo->records, record);
+        Record_del(record);
     }
 
     free(filerepo);
