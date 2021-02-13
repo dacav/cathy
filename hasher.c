@@ -85,7 +85,7 @@ int Hasher_wait(pid_t child)
 }
 
 static
-void Hasher_exec(const char * const hashprg, int r, int w, const char *filename)
+void Hasher_exec(const char * const hashprg, int r, int w, const char *path)
 {
     if (dup2(r, STDIN_FILENO) == -1)
         err(1, "dup2(%d, %d)", r, STDIN_FILENO);
@@ -95,7 +95,7 @@ void Hasher_exec(const char * const hashprg, int r, int w, const char *filename)
         err(1, "dup2(%d, %d)", w, STDOUT_FILENO);
     if (Util_fdclose(&w) == -1)
         exit(EXIT_FAILURE);
-    execlp(hashprg, hashprg, filename, NULL);
+    execlp(hashprg, hashprg, path, NULL);
     err(1, "execlp");
 }
 
@@ -132,7 +132,7 @@ int Hasher_read(const Hasher *hasher, int r)
     return -1;
 }
 
-const char * Hasher_hash_file(const Hasher *hasher, const char *filename)
+const char * Hasher_hash_file(const Hasher *hasher, const char *path)
 {
     enum {
         r = 0,
@@ -154,7 +154,7 @@ const char * Hasher_hash_file(const Hasher *hasher, const char *filename)
             goto fail;
 
         case 0:
-            Hasher_exec(hasher->hashprg, pipefd[r], pipefd[w], filename);
+            Hasher_exec(hasher->hashprg, pipefd[r], pipefd[w], path);
 
         default:
             break;
