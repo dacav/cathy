@@ -6,58 +6,58 @@
 #include <unistd.h>
 
 #include "util.h"
-#include "hash.h"
+#include "hasher.h"
 
-struct Hash {
+struct Hasher {
     const char *hashprg;
     char *buffer;
 };
 
 enum {
-    Hash_checksum_length = 128, // ok for anything up to sha512
-    Hash_buflen = Hash_checksum_length + 1,
+    Hasher_checksum_length = 128, // ok for anything up to sha512
+    Hasher_buflen = Hasher_checksum_length + 1,
 };
 
-void Hash_del(Hash *hash)
+void Hasher_del(Hasher *hasher)
 {
-    if (!hash)
+    if (!hasher)
         return;
 
-    free((void *)hash->hashprg);
-    free((void *)hash->buffer);
-    free(hash);
+    free((void *)hasher->hashprg);
+    free((void *)hasher->buffer);
+    free(hasher);
 }
 
-Hash *Hash_new(const char *hashprg)
+Hasher *Hasher_new(const char *hashprg)
 {
-    Hash *hash = malloc(sizeof(Hash));
-    if (!hash) {
+    Hasher *hasher = malloc(sizeof(Hasher));
+    if (!hasher) {
         warn("malloc");
         goto fail;
     }
-    *hash = (Hash){};
+    *hasher = (Hasher){};
 
-    hash->hashprg = strdup(hashprg);
-    if (!hash->hashprg) {
+    hasher->hashprg = strdup(hashprg);
+    if (!hasher->hashprg) {
         warn("strdup");
         goto fail;
     }
 
-    hash->buffer = malloc(Hash_buflen);
-    if (!hash->buffer) {
+    hasher->buffer = malloc(Hasher_buflen);
+    if (!hasher->buffer) {
         warn("malloc");
         goto fail;
     }
 
-    return hash;
+    return hasher;
 
 fail:
-    Hash_del(hash);
+    Hasher_del(hasher);
     return NULL;
 }
 
 static
-int Hash_wait(pid_t child)
+int Hasher_wait(pid_t child)
 {
     for (;;) {
         int w, status;
@@ -85,7 +85,7 @@ int Hash_wait(pid_t child)
 }
 
 static
-void Hash_exec(const char * const hashprg, int r, int w, const char *filename)
+void Hasher_exec(const char * const hashprg, int r, int w, const char *filename)
 {
     if (dup2(r, STDIN_FILENO) == -1)
         err(1, "dup2(%d, %d)", r, STDIN_FILENO);
@@ -100,14 +100,14 @@ void Hash_exec(const char * const hashprg, int r, int w, const char *filename)
 }
 
 static
-int Hash_read(const Hash *hash, int r)
+int Hasher_read(const Hasher *hasher, int r)
 {
     ssize_t n;
     char *buffer;
     int room;
 
-    room = Hash_buflen;
-    buffer = hash->buffer;
+    room = Hasher_buflen;
+    buffer = hasher->buffer;
 
     do {
         n = read(r, buffer, room);
@@ -128,11 +128,11 @@ int Hash_read(const Hash *hash, int r)
         buffer += n;
     } while (room && n);
 
-    warnx("invalid hash: %.*s", Hash_buflen, hash->buffer);
+    warnx("invalid hash: %.*s", Hasher_buflen, hasher->buffer);
     return -1;
 }
 
-const char * Hash_file(const Hash *hash, const char *filename)
+const char * Hasher_file(const Hasher *hasher, const char *filename)
 {
     enum {
         r = 0,
@@ -154,7 +154,7 @@ const char * Hash_file(const Hash *hash, const char *filename)
             goto fail;
 
         case 0:
-            Hash_exec(hash->hashprg, pipefd[r], pipefd[w], filename);
+            Hasher_exec(hasher->hashprg, pipefd[r], pipefd[w], filename);
 
         default:
             break;
@@ -164,19 +164,19 @@ const char * Hash_file(const Hash *hash, const char *filename)
         goto fail;
     pipefd[w] = -1;
 
-    if (Hash_read(hash, pipefd[r]) == -1)
+    if (Hasher_read(hasher, pipefd[r]) == -1)
         goto fail;
 
-    if (Hash_wait(pid))
+    if (Hasher_wait(pid))
         goto fail;
 
     Util_fdclose(&pipefd[r]);
 
-    return hash->buffer;
+    return hasher->buffer;
     
 fail:
     if (pid > 0)
-        Hash_wait(pid);
+        Hasher_wait(pid);
 
     Util_fdclose(&pipefd[r]);
     Util_fdclose(&pipefd[w]);

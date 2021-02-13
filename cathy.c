@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "filerepo.h"
-#include "hash.h"
+#include "hasher.h"
 #include "ioread.h"
 #include "outdir.h"
 
@@ -11,7 +11,7 @@
 int main(int argc, char **argv)
 {
     IORead ioread;
-    Hash *hash;
+    Hasher *hash;
     FileRepo *filerepo;
     OutDir outdir;
     int fails = 0;
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
 
     IORead_init(&ioread);
 
-    hash = Hash_new(hashprg);
+    hash = Hasher_new(hashprg);
     if (!hash) {
         ++fails;
         goto exit;
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 exit:
     OutDir_free(&outdir);
     FileRepo_del(filerepo);
-    Hash_del(hash);
+    Hasher_del(hash);
     IORead_free(&ioread);
     return fails ? EXIT_FAILURE : EXIT_SUCCESS;
 }

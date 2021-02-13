@@ -23,7 +23,7 @@ typedef struct {
 
 struct FileRepo {
     Record *records;
-    const Hash *hasher;
+    const Hasher *hasher;
 };
 
 static
@@ -47,7 +47,7 @@ void Record_del(Record *record)
     }
 }
 
-FileRepo *FileRepo_new(const Hash *hasher)
+FileRepo *FileRepo_new(const Hasher *hasher)
 {
     FileRepo *filerepo;
 
@@ -129,7 +129,7 @@ File *FileRepo_add(FileRepo *filerepo, const char *path)
     }
     *pfile = (PFile){};
 
-    filehash = Hash_file(filerepo->hasher, path);
+    filehash = Hasher_file(filerepo->hasher, path);
     if (!filehash)
         goto fail;
 
