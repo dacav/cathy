@@ -46,7 +46,7 @@ Hasher *Hasher_new(const char *hashprg, const char *compprg)
         goto fail;
     }
 
-    hasher->compprg = strdup(hashprg);
+    hasher->compprg = strdup(compprg);
     if (!hasher->compprg) {
         warn("strdup");
         goto fail;
