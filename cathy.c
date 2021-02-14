@@ -1,18 +1,19 @@
 #include <err.h>
 #include <stdlib.h>
 
-#include "hash.h"
+#include "filerepo.h"
+#include "hasher.h"
 #include "ioread.h"
 #include "outdir.h"
-#include "util.h"
 
 /* -- main ------------------------------------------------------------ */
 
 int main(int argc, char **argv)
 {
     IORead ioread;
+    Hasher *hash;
+    FileRepo *filerepo;
     OutDir outdir;
-    Hash *hash;
     int fails = 0;
 
     const char *outdir_path = "./cathy.d"; // TODO: argv
@@ -20,8 +21,14 @@ int main(int argc, char **argv)
 
     IORead_init(&ioread);
 
-    hash = Hash_new(hashprg);
+    hash = Hasher_new(hashprg);
     if (!hash) {
+        ++fails;
+        goto exit;
+    }
+
+    filerepo = FileRepo_new(hash);
+    if (!filerepo) {
         ++fails;
         goto exit;
     }
@@ -32,26 +39,19 @@ int main(int argc, char **argv)
     }
 
     const char *fname;
-    while (fname = IORead_next(&ioread), fname != NULL) {
-        const char *filehash;
-
-        filehash = Hash_file(hash, fname);
-        if (!filehash) {
-            warnx("skipping %s: could not compute hash", fname);
+    while (fname = IORead_next(&ioread), fname != NULL)
+        if (FileRepo_add(filerepo, fname) == NULL) {
+            warnx("failure handling %s", fname);
             ++fails;
-            continue;
         }
-
-        if (OutDir_link(&outdir, filehash, fname))
-            ++fails;
-    }
 
     if (ioread.errno_s)
         ++fails;
 
 exit:
     OutDir_free(&outdir);
-    Hash_del(hash);
+    FileRepo_del(filerepo);
+    Hasher_del(hash);
     IORead_free(&ioread);
     return fails ? EXIT_FAILURE : EXIT_SUCCESS;
 }
