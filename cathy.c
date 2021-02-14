@@ -11,8 +11,8 @@
 int main(int argc, char **argv)
 {
     IORead ioread;
-    Hasher *hash;
-    FileRepo *filerepo;
+    Hasher *hash = NULL;
+    FileRepo *filerepo = NULL;
     OutDir outdir;
     int fails = 0;
 
