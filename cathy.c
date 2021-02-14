@@ -8,7 +8,7 @@
 
 /* -- main ------------------------------------------------------------ */
 
-int main(int argc, char **argv)
+int main(void)
 {
     IORead ioread;
     Hasher *hash = NULL;
