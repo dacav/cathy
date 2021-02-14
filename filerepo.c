@@ -135,7 +135,7 @@ int FileRepo_attach_record(FileRepo *filerepo, PFile *pfile)
     return 0;
 }
 
-File *FileRepo_add(FileRepo *filerepo, const char *path)
+int FileRepo_add(FileRepo *filerepo, const char *path)
 {
     PFile *pfile;
     bool fileinit = false;
@@ -159,13 +159,13 @@ File *FileRepo_add(FileRepo *filerepo, const char *path)
     if (FileRepo_attach_record(filerepo, pfile))
         goto fail;
 
-    return &pfile->file;
+    return 0;
 
 fail:
     if (fileinit)
         File_free(&pfile->file);
     free(pfile);
-    return NULL;
+    return -1;
 }
 
 void FileRepo_del(FileRepo *filerepo)

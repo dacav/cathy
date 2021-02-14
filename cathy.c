@@ -6,8 +6,6 @@
 #include "ioread.h"
 #include "outdir.h"
 
-/* -- main ------------------------------------------------------------ */
-
 int main(void)
 {
     IORead ioread;
@@ -41,7 +39,7 @@ int main(void)
 
     const char *fname;
     while (fname = IORead_next(&ioread), fname != NULL)
-        if (FileRepo_add(filerepo, fname) == NULL) {
+        if (FileRepo_add(filerepo, fname)) {
             warnx("failure handling %s", fname);
             ++fails;
         }
