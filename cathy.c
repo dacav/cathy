@@ -8,20 +8,21 @@
 
 /* -- main ------------------------------------------------------------ */
 
-int main(int argc, char **argv)
+int main(void)
 {
     IORead ioread;
-    Hasher *hash;
-    FileRepo *filerepo;
+    Hasher *hash = NULL;
+    FileRepo *filerepo = NULL;
     OutDir outdir;
     int fails = 0;
 
     const char *outdir_path = "./cathy.d"; // TODO: argv
     const char *hashprg = "md5sum";
+    const char *cmpprog = "cmp";
 
     IORead_init(&ioread);
 
-    hash = Hasher_new(hashprg);
+    hash = Hasher_new(hashprg, cmpprog);
     if (!hash) {
         ++fails;
         goto exit;

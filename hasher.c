@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <err.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -10,6 +11,7 @@
 
 struct Hasher {
     const char *hashprg;
+    const char *compprg;
     char *buffer;
 };
 
@@ -24,11 +26,12 @@ void Hasher_del(Hasher *hasher)
         return;
 
     free((void *)hasher->hashprg);
+    free((void *)hasher->compprg);
     free((void *)hasher->buffer);
     free(hasher);
 }
 
-Hasher *Hasher_new(const char *hashprg)
+Hasher *Hasher_new(const char *hashprg, const char *compprg)
 {
     Hasher *hasher = malloc(sizeof(Hasher));
     if (!hasher) {
@@ -39,6 +42,12 @@ Hasher *Hasher_new(const char *hashprg)
 
     hasher->hashprg = strdup(hashprg);
     if (!hasher->hashprg) {
+        warn("strdup");
+        goto fail;
+    }
+
+    hasher->compprg = strdup(compprg);
+    if (!hasher->compprg) {
         warn("strdup");
         goto fail;
     }
@@ -57,7 +66,7 @@ fail:
 }
 
 static
-int Hasher_wait(pid_t child)
+int Hasher_wait(pid_t child, int *exit_status)
 {
     for (;;) {
         int w, status;
@@ -69,7 +78,9 @@ int Hasher_wait(pid_t child)
         }
 
         if (WIFEXITED(status)) {
-            return WEXITSTATUS(status);
+            if (exit_status)
+                *exit_status = WEXITSTATUS(status);
+            return 0;
         }
 
         if (WIFSIGNALED(status)) {
@@ -132,6 +143,32 @@ int Hasher_read(const Hasher *hasher, int r)
     return -1;
 }
 
+int Hasher_comp_files(const Hasher *hash,
+                      const char *path1,
+                      const char *path2,
+                      bool *equals)
+{
+    pid_t pid;
+    int exit_status;
+
+    pid = fork();
+    switch (pid) {
+    case -1:
+        warn("fork");
+        return -1;
+
+    case 0:
+        execlp(hash->compprg, hash->compprg, path1, path2, NULL);
+        err(1, "execlp");
+
+    default:
+        if (Hasher_wait(pid, &exit_status))
+            return -1;
+        *equals = !exit_status;
+        return 0;
+    }
+}
+
 const char * Hasher_hash_file(const Hasher *hasher, const char *path)
 {
     enum {
@@ -141,6 +178,7 @@ const char * Hasher_hash_file(const Hasher *hasher, const char *path)
 
     pid_t pid = -1;
     int pipefd[2] = {-1, -1};
+    int exit_status;
 
     if (pipe(pipefd) == -1) {
         warn("pipe");
@@ -149,15 +187,15 @@ const char * Hasher_hash_file(const Hasher *hasher, const char *path)
 
     pid = fork();
     switch (pid) {
-        case -1:
-            warn("fork");
-            goto fail;
+    case -1:
+        warn("fork");
+        goto fail;
 
-        case 0:
-            Hasher_exec(hasher->hashprg, pipefd[r], pipefd[w], path);
+    case 0:
+        Hasher_exec(hasher->hashprg, pipefd[r], pipefd[w], path);
 
-        default:
-            break;
+    default:
+        break;
     }
 
     if (Util_fdclose(&pipefd[w]) == -1)
@@ -167,7 +205,7 @@ const char * Hasher_hash_file(const Hasher *hasher, const char *path)
     if (Hasher_read(hasher, pipefd[r]) == -1)
         goto fail;
 
-    if (Hasher_wait(pid))
+    if (Hasher_wait(pid, &exit_status) || exit_status)
         goto fail;
 
     Util_fdclose(&pipefd[r]);
@@ -176,7 +214,7 @@ const char * Hasher_hash_file(const Hasher *hasher, const char *path)
     
 fail:
     if (pid > 0)
-        Hasher_wait(pid);
+        Hasher_wait(pid, NULL);
 
     Util_fdclose(&pipefd[r]);
     Util_fdclose(&pipefd[w]);

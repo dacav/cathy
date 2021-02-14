@@ -69,9 +69,28 @@ fail:
 }
 
 static
-int FileRepo_attach_pfile(Record *record, PFile *pfile)
+int FileRepo_attach_pfile(FileRepo *filerepo, Record *record, PFile *pfile)
 {
-    pfile->collisions.next = record->pfile;
+    PFile * const head = record->pfile;
+
+    if (head) {
+        bool is_copy;
+        if (Hasher_comp_files(
+                filerepo->hasher,
+                head->file.path,
+                pfile->file.path,
+                &is_copy) == -1)
+            return -1;
+
+        if (!is_copy)
+            warnx("Collision is not a copy! hash %s path1 %s path2 %s",
+                head->file.hash,
+                head->file.path,
+                pfile->file.path
+            );
+    }
+
+    pfile->collisions.next = head;
     record->pfile = pfile;
 
     if (pfile->file.mtime != record->min_mtime) {
@@ -93,7 +112,7 @@ int FileRepo_attach_record(FileRepo *filerepo, PFile *pfile)
 
     HASH_FIND_STR(filerepo->records, pfile->file.hash, record);
     if (record)
-        return FileRepo_attach_pfile(record, pfile);
+        return FileRepo_attach_pfile(filerepo, record, pfile);
 
     record = malloc(sizeof(Record));
     if (!record) {
