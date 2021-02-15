@@ -158,6 +158,7 @@ int Hasher_comp_files(const Hasher *hash,
         return -1;
 
     case 0:
+        close(STDIN_FILENO);
         execlp(hash->compprg, hash->compprg, path1, path2, NULL);
         err(1, "execlp %s %s %s", hash->compprg, path1, path2);
 
