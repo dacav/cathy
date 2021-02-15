@@ -107,7 +107,7 @@ void Hasher_exec(const char * const hashprg, int r, int w, const char *path)
     if (Util_fdclose(&w) == -1)
         exit(EXIT_FAILURE);
     execlp(hashprg, hashprg, path, NULL);
-    err(1, "execlp");
+    err(1, "execlp %s %s", hashprg, path);
 }
 
 static
@@ -159,7 +159,7 @@ int Hasher_comp_files(const Hasher *hash,
 
     case 0:
         execlp(hash->compprg, hash->compprg, path1, path2, NULL);
-        err(1, "execlp");
+        err(1, "execlp %s %s %s", hash->compprg, path1, path2);
 
     default:
         if (Hasher_wait(pid, &exit_status))
