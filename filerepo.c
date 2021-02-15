@@ -3,6 +3,7 @@
 #include <err.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sysexits.h>
 
 #include <uthash.h>
 
@@ -167,6 +168,57 @@ fail:
     free(pfile);
     return -1;
 }
+
+#if 0
+const File *FileRepo_iter(const FileRepo *filerepo, void **aux)
+{
+    typedef struct {
+        const Record *record;
+        const PFile *pfile;
+        File file;
+    } Iter;
+
+    Iter *iter = *aux;
+    const Record *record;
+
+    if (iter == NULL) {
+        if (!filerepo->records)
+            return NULL;    // just empty.
+
+        iter = *aux = malloc(sizeof(Iter));
+        if (!iter) {
+            warn("malloc failed, iteration yields nothing");
+            return NULL;
+        }
+        record = filerepo->records;
+    }
+    else if (!iter->pfile) {
+        if (!iter->record) {
+            // cannot advance, reached end of iteration
+            free(iter);
+            return *aux = NULL;
+        }
+
+        record = iter->record->hh.next;
+    }
+    else
+        record = iter->record;
+
+    if (!record->pfile)
+        err(EX_SOFTWARE, "buggy! empty record");
+
+    *iter = (Iter) {
+        .record = record,
+        .pfile = record->pfile,
+        .file.path = iter->pfile->file.path,
+        .file.hash = iter->pfile->file.hash,
+        .file.mtime = iter->record->min_mtime,
+    };
+    iter->pfile = iter->pfile->collisions.next;
+
+    return &iter->file;
+}
+#endif
 
 void FileRepo_del(FileRepo *filerepo)
 {
