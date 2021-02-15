@@ -18,6 +18,7 @@ typedef struct PFile {
 
 typedef struct {
     PFile *pfile;
+    const char *filehash;
     time_t min_mtime;
     UT_hash_handle hh;
 } Record;
@@ -28,6 +29,40 @@ struct FileRepo {
 };
 
 static
+PFile *PFile_new(const char *path)
+{
+    PFile *pfile;
+
+    pfile = malloc(sizeof(PFile));
+    if (!pfile) {
+        warn("malloc");
+        goto fail;
+    }
+    *pfile = (PFile){};
+
+    if (File_init(&pfile->file, path))
+        goto fail;
+
+    return pfile;
+
+fail:
+    // NOTE: skipped call to File_free, as File_init is the last call
+    //  before returning.
+    free(pfile);
+    return NULL;
+}
+
+static
+void PFile_del(PFile *pfile)
+{
+    if (!pfile)
+        return;
+
+    File_free(&pfile->file);
+    free(pfile);
+}
+
+static
 void Record_del(Record *record)
 {
     PFile *pfile;
@@ -36,14 +71,14 @@ void Record_del(Record *record)
         return;
 
     pfile = record->pfile;
+    free((void *)record->filehash);
     free(record);
 
     while (pfile) {
         PFile *next;
 
-        File_free(&pfile->file);
         next = pfile->collisions.next;
-        free(pfile);
+        PFile_del(pfile);
         pfile = next;
     }
 }
@@ -70,6 +105,27 @@ fail:
 }
 
 static
+int FileRepo_handle_duplicate(Record *record,
+                              PFile *pfile)
+{
+    warnx("duplicate detected: f1 %s f2 %s hash %s.",
+        record->pfile->file.path,
+        pfile->file.path,
+        record->filehash
+    );
+
+    if (pfile->file.mtime != record->min_mtime) {
+        warnx(" mtime discrepancy for duplicate, taking smaller value.");
+
+        if (pfile->file.mtime < record->min_mtime)
+            record->min_mtime = pfile->file.mtime;
+    }
+
+    PFile_del(pfile);
+    return 0;
+}
+
+static
 int FileRepo_attach_pfile(FileRepo *filerepo, Record *record, PFile *pfile)
 {
     PFile * const head = record->pfile;
@@ -83,35 +139,24 @@ int FileRepo_attach_pfile(FileRepo *filerepo, Record *record, PFile *pfile)
                 &is_copy) == -1)
             return -1;
 
-        if (!is_copy)
-            warnx("Collision is not a copy! hash %s path1 %s path2 %s",
-                head->file.hash,
-                head->file.path,
-                pfile->file.path
-            );
+        if (is_copy)
+            return FileRepo_handle_duplicate(record, pfile);
     }
 
     pfile->collisions.next = head;
     record->pfile = pfile;
 
-    if (pfile->file.mtime != record->min_mtime) {
-        warnx("mtime discrepancy for hash '%s', taking smaller value",
-            pfile->file.hash
-        );
-
-        if (pfile->file.mtime < record->min_mtime)
-            record->min_mtime = pfile->file.mtime;
-    }
-
     return 0;
 }
 
 static
-int FileRepo_attach_record(FileRepo *filerepo, PFile *pfile)
+int FileRepo_attach_record(FileRepo *filerepo,
+                           const char *filehash,
+                           PFile *pfile)
 {
     Record *record;
 
-    HASH_FIND_STR(filerepo->records, pfile->file.hash, record);
+    HASH_FIND_STR(filerepo->records, filehash, record);
     if (record)
         return FileRepo_attach_pfile(filerepo, record, pfile);
 
@@ -123,14 +168,20 @@ int FileRepo_attach_record(FileRepo *filerepo, PFile *pfile)
 
     *record = (Record){
         .pfile = pfile,
+        .filehash = strdup(filehash),
         .min_mtime = pfile->file.mtime,
     };
+
+    if (!record->filehash) {
+        warn("strdup");
+        return -1;
+    }
 
     HASH_ADD_KEYPTR(
         hh,
         filerepo->records,
-        pfile->file.hash,
-        strlen(pfile->file.hash),
+        record->filehash,
+        strlen(record->filehash),
         record);
 
     return 0;
@@ -138,34 +189,24 @@ int FileRepo_attach_record(FileRepo *filerepo, PFile *pfile)
 
 int FileRepo_add(FileRepo *filerepo, const char *path)
 {
-    PFile *pfile;
-    bool fileinit = false;
+    PFile *pfile = NULL;
     const char *filehash;
-
-    pfile = malloc(sizeof(PFile));
-    if (!pfile) {
-        warn("malloc");
-        goto fail;
-    }
-    *pfile = (PFile){};
 
     filehash = Hasher_hash_file(filerepo->hasher, path);
     if (!filehash)
         goto fail;
 
-    if (File_init(&pfile->file, path, filehash))
+    pfile = PFile_new(path);
+    if (!pfile)
         goto fail;
-    fileinit = true;
 
-    if (FileRepo_attach_record(filerepo, pfile))
+    if (FileRepo_attach_record(filerepo, filehash, pfile))
         goto fail;
 
     return 0;
 
 fail:
-    if (fileinit)
-        File_free(&pfile->file);
-    free(pfile);
+    PFile_del(pfile);
     return -1;
 }
 

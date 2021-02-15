@@ -4,9 +4,8 @@
 
 typedef struct File {
     const char *path;
-    const char *hash;
     time_t mtime;
 } File;
 
-int File_init(File *, const char *path, const char *hash);
+int File_init(File *, const char *path);
 void File_free(File *);
