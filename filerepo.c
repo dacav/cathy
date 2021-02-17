@@ -19,7 +19,6 @@ typedef struct PFile {
 typedef struct {
     PFile *pfile;
     const char *filehash;
-    time_t min_mtime;
     UT_hash_handle hh;
 } Record;
 
@@ -105,46 +104,50 @@ fail:
 }
 
 static
-int FileRepo_handle_duplicate(Record *record,
-                              PFile *pfile)
+int FileRepo_handle_duplicate(PFile *pfile, PFile *duplicate)
 {
-    warnx("duplicate detected: f1 %s f2 %s hash %s.",
-        record->pfile->file.path,
-        pfile->file.path,
-        record->filehash
-    );
+    // We want to suggest the removal of one of the two duplicates.
+    // From the data perspective it doesn't matter which one, but the
+    // file modification time (mtime) might be different.
+    // If this is the case, we want to keep the oldest file, since the
+    // most recent copy is likely to be wrong (unless the clock was
+    // in the past for the host that made the copy.
 
-    if (pfile->file.mtime != record->min_mtime) {
-        warnx(" mtime discrepancy for duplicate, taking smaller value.");
+    if (duplicate->file.mtime < pfile->file.mtime)
+        File_objswap(&pfile->file, &duplicate->file);
 
-        if (pfile->file.mtime < record->min_mtime)
-            record->min_mtime = pfile->file.mtime;
-    }
+    warnx("Would remove duplicate: %s", duplicate->file.path);
+    debug(" keep: %s (mtime=%ld)", pfile->file.path, pfile->file.mtime);
+    debug(" drop: %s (mtime=%ld)", duplicate->file.path, duplicate->file.mtime);
 
-    PFile_del(pfile);
+    PFile_del(duplicate);
     return 0;
 }
 
 static
-int FileRepo_attach_pfile(FileRepo *filerepo, Record *record, PFile *pfile)
+int FileRepo_attach_pfile(FileRepo *filerepo,
+                          Record *record,
+                          PFile *new_pfile)
 {
-    PFile * const head = record->pfile;
+    PFile *pfile = record->pfile;
 
-    if (head) {
+    while (pfile) {
         bool is_copy;
         if (Hasher_comp_files(
                 filerepo->hasher,
-                head->file.path,
                 pfile->file.path,
+                new_pfile->file.path,
                 &is_copy) == -1)
             return -1;
 
         if (is_copy)
-            return FileRepo_handle_duplicate(record, pfile);
+            return FileRepo_handle_duplicate(pfile, new_pfile);
+
+        pfile = pfile->collisions.next;
     }
 
-    pfile->collisions.next = head;
-    record->pfile = pfile;
+    new_pfile->collisions.next = record->pfile;
+    record->pfile = new_pfile;
 
     return 0;
 }
@@ -169,7 +172,6 @@ int FileRepo_attach_record(FileRepo *filerepo,
     *record = (Record){
         .pfile = pfile,
         .filehash = strdup(filehash),
-        .min_mtime = pfile->file.mtime,
     };
 
     if (!record->filehash) {
