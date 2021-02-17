@@ -6,6 +6,7 @@
 #include <sysexits.h>
 
 #include <uthash.h>
+#include <utlist.h>
 
 #define debug(...) warnx(__VA_ARGS__)
 
@@ -63,22 +64,19 @@ void PFile_del(PFile *pfile)
 static
 void Record_del(Record *record)
 {
-    PFile *pfile;
+    PFile *pfile, *tmp;
 
     if (!record)
         return;
 
     pfile = record->unique_files;
+    LL_FOREACH_SAFE(record->unique_files, pfile, tmp) {
+        LL_DELETE(record->unique_files, pfile);
+        PFile_del(pfile);
+    }
+
     free((void *)record->filehash);
     free(record);
-
-    while (pfile) {
-        PFile *next;
-
-        next = pfile->next;
-        PFile_del(pfile);
-        pfile = next;
-    }
 }
 
 FileRepo *FileRepo_new(const Hasher *hasher)
@@ -120,8 +118,7 @@ int FileRepo_handle_duplicate(FileRepo *filerepo,
     debug("Would remove duplicate: %s", duplicate->file.path);
     debug(" keep: %s (mtime=%ld)", pfile->file.path, pfile->file.mtime);
     debug(" drop: %s (mtime=%ld)", duplicate->file.path, duplicate->file.mtime);
-    duplicate->next = filerepo->removals;
-    filerepo->removals = duplicate;
+    LL_PREPEND(filerepo->removals, duplicate);
     return 0;
 }
 
@@ -130,9 +127,9 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
                           Record *record,
                           PFile *new_pfile)
 {
-    PFile *pfile = record->unique_files;
+    PFile *pfile;
 
-    while (pfile) {
+    LL_FOREACH(record->unique_files, pfile) {
         bool is_copy;
         if (Hasher_comp_files(
                 filerepo->hasher,
@@ -143,13 +140,9 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
 
         if (is_copy)
             return FileRepo_handle_duplicate(filerepo, pfile, new_pfile);
-
-        pfile = pfile->next;
     }
 
-    new_pfile->next = record->unique_files;
-    record->unique_files = new_pfile;
-
+    LL_PREPEND(record->unique_files, new_pfile);
     return 0;
 }
 
@@ -266,24 +259,20 @@ const File *FileRepo_iter(const FileRepo *filerepo, void **aux)
 
 void FileRepo_del(FileRepo *filerepo)
 {
-    Record *record, *tmp;
-    PFile *pfile;
+    Record *record, *tmp1;
+    PFile *pfile, *tmp2;
 
     if (!filerepo)
         return;
 
-    HASH_ITER(hh, filerepo->records, record, tmp) {
+    HASH_ITER(hh, filerepo->records, record, tmp1) {
         HASH_DEL(filerepo->records, record);
         Record_del(record);
     }
 
-    pfile = filerepo->removals;
-    while (pfile) {
-        PFile *next;
-
-        next = pfile->next;
+    LL_FOREACH_SAFE(filerepo->removals, pfile, tmp2) {
+        LL_DELETE(filerepo->removals, pfile);
         PFile_del(pfile);
-        pfile = next;
     }
 
     free(filerepo);
