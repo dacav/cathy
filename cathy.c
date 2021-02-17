@@ -6,6 +6,16 @@
 #include "ioread.h"
 #include "outdir.h"
 
+static
+void loop_entries(const FileRepo *filerepo)
+{
+    void *aux = NULL;
+    const FileRepo_Entry *entry;
+
+    while (entry = FileRepo_iter(filerepo, &aux), entry != NULL)
+        warnx("file %s filehash %s", entry->file->path, entry->filehash);
+}
+
 int main(void)
 {
     IORead ioread;
@@ -43,9 +53,10 @@ int main(void)
             warnx("failure handling %s", fname);
             ++fails;
         }
-
     if (ioread.errno_s)
         ++fails;
+
+    loop_entries(filerepo);
 
 exit:
     OutDir_free(&outdir);

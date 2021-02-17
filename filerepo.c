@@ -234,7 +234,10 @@ const FileRepo_Entry *FileRepo_iter(const FileRepo *filerepo, void **aux)
             .pfile = filerepo->records->unique_files,
         };
     }
-    else if (!iter->pfile->next) {
+    else if (iter->pfile->next) {
+        debug("iter next, same record");
+        iter->pfile = iter->pfile->next;
+    } else {
         // Advance record, take the first pfile of the record.
         iter->record = iter->record->hh.next;
 
@@ -245,9 +248,6 @@ const FileRepo_Entry *FileRepo_iter(const FileRepo *filerepo, void **aux)
             return *aux = NULL;
         }
         iter->pfile = iter->record->unique_files;
-    } else {
-        debug("iter next");
-        iter->pfile = iter->pfile->next;
     }
 
     if (!iter->pfile || !iter->record)
