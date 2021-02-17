@@ -206,56 +206,59 @@ fail:
     return -1;
 }
 
-#if 0
-const File *FileRepo_iter(const FileRepo *filerepo, void **aux)
+const FileRepo_Entry *FileRepo_iter(const FileRepo *filerepo, void **aux)
 {
     typedef struct {
         const Record *record;
         const PFile *pfile;
-        File file;
+        FileRepo_Entry entry;
     } Iter;
 
     Iter *iter = *aux;
-    const Record *record;
 
     if (iter == NULL) {
+        debug("iter init, %s", filerepo->records ? "has data" : "empty");
         if (!filerepo->records)
-            return NULL;    // just empty.
+            return NULL;    // Empty. Stop immediately.
 
         iter = *aux = malloc(sizeof(Iter));
         if (!iter) {
             warn("malloc failed, iteration yields nothing");
             return NULL;
         }
-        record = filerepo->records;
+
+        // Take the first record, and the first of the files of
+        // the record.
+        *iter = (Iter){
+            .record = filerepo->records,
+            .pfile = filerepo->records->unique_files,
+        };
     }
-    else if (!iter->pfile) {
+    else if (!iter->pfile->next) {
+        // Advance record, take the first pfile of the record.
+        iter->record = iter->record->hh.next;
+
+        debug("iter next, %s", iter->record ? "advance record" : "end");
         if (!iter->record) {
-            // cannot advance, reached end of iteration
+            // Cannot advance, reached end of iteration.
             free(iter);
             return *aux = NULL;
         }
-
-        record = iter->record->hh.next;
+        iter->pfile = iter->record->unique_files;
+    } else {
+        debug("iter next");
+        iter->pfile = iter->pfile->next;
     }
-    else
-        record = iter->record;
 
-    if (!record->pfile)
-        err(EX_SOFTWARE, "buggy! empty record");
+    if (!iter->pfile || !iter->record)
+        errx(EX_SOFTWARE, "buggy! %p %p", iter->pfile, iter->record);
 
-    *iter = (Iter) {
-        .record = record,
-        .pfile = record->pfile,
-        .file.path = iter->pfile->file.path,
-        .file.hash = iter->pfile->file.hash,
-        .file.mtime = iter->record->min_mtime,
+    iter->entry = (FileRepo_Entry){
+        .file = &iter->pfile->file,
+        .filehash = iter->record->filehash,
     };
-    iter->pfile = iter->pfile->collisions.next;
-
-    return &iter->file;
+    return &iter->entry;
 }
-#endif
 
 void FileRepo_del(FileRepo *filerepo)
 {

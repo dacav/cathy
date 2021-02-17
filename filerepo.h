@@ -4,8 +4,14 @@
 #include "hasher.h"
 
 typedef struct FileRepo FileRepo;
+typedef struct {
+    const File *file;
+    const char *filehash;
+} FileRepo_Entry;
 
 FileRepo *FileRepo_new(const Hasher *);
+
+const FileRepo_Entry *FileRepo_iter(const FileRepo *, void **aux);
 
 int FileRepo_add(FileRepo *, const char *path);
 
