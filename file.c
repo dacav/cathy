@@ -42,3 +42,12 @@ fail:
     File_free(file);
     return -1;
 }
+
+void File_objswap(File *f1, File *f2)
+{
+    File aux;
+
+    aux = *f1;
+    *f1 = *f2;
+    *f2 = aux;
+}
