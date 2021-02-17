@@ -11,13 +11,11 @@
 
 typedef struct PFile {
     File file;
-    struct {
-        struct PFile *next;
-    } collisions;
+    struct PFile *next;
 } PFile;
 
 typedef struct {
-    PFile *pfile;
+    PFile *unique_files;
     const char *filehash;
     UT_hash_handle hh;
 } Record;
@@ -25,6 +23,7 @@ typedef struct {
 struct FileRepo {
     Record *records;
     const Hasher *hasher;
+    PFile *removals;
 };
 
 static
@@ -69,14 +68,14 @@ void Record_del(Record *record)
     if (!record)
         return;
 
-    pfile = record->pfile;
+    pfile = record->unique_files;
     free((void *)record->filehash);
     free(record);
 
     while (pfile) {
         PFile *next;
 
-        next = pfile->collisions.next;
+        next = pfile->next;
         PFile_del(pfile);
         pfile = next;
     }
@@ -104,7 +103,9 @@ fail:
 }
 
 static
-int FileRepo_handle_duplicate(PFile *pfile, PFile *duplicate)
+int FileRepo_handle_duplicate(FileRepo *filerepo,
+                              PFile *pfile,
+                              PFile *duplicate)
 {
     // We want to suggest the removal of one of the two duplicates.
     // From the data perspective it doesn't matter which one, but the
@@ -116,11 +117,11 @@ int FileRepo_handle_duplicate(PFile *pfile, PFile *duplicate)
     if (duplicate->file.mtime < pfile->file.mtime)
         File_objswap(&pfile->file, &duplicate->file);
 
-    warnx("Would remove duplicate: %s", duplicate->file.path);
+    debug("Would remove duplicate: %s", duplicate->file.path);
     debug(" keep: %s (mtime=%ld)", pfile->file.path, pfile->file.mtime);
     debug(" drop: %s (mtime=%ld)", duplicate->file.path, duplicate->file.mtime);
-
-    PFile_del(duplicate);
+    duplicate->next = filerepo->removals;
+    filerepo->removals = duplicate;
     return 0;
 }
 
@@ -129,7 +130,7 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
                           Record *record,
                           PFile *new_pfile)
 {
-    PFile *pfile = record->pfile;
+    PFile *pfile = record->unique_files;
 
     while (pfile) {
         bool is_copy;
@@ -141,13 +142,13 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
             return -1;
 
         if (is_copy)
-            return FileRepo_handle_duplicate(pfile, new_pfile);
+            return FileRepo_handle_duplicate(filerepo, pfile, new_pfile);
 
-        pfile = pfile->collisions.next;
+        pfile = pfile->next;
     }
 
-    new_pfile->collisions.next = record->pfile;
-    record->pfile = new_pfile;
+    new_pfile->next = record->unique_files;
+    record->unique_files = new_pfile;
 
     return 0;
 }
@@ -170,7 +171,7 @@ int FileRepo_attach_record(FileRepo *filerepo,
     }
 
     *record = (Record){
-        .pfile = pfile,
+        .unique_files = pfile,
         .filehash = strdup(filehash),
     };
 
@@ -266,6 +267,7 @@ const File *FileRepo_iter(const FileRepo *filerepo, void **aux)
 void FileRepo_del(FileRepo *filerepo)
 {
     Record *record, *tmp;
+    PFile *pfile;
 
     if (!filerepo)
         return;
@@ -273,6 +275,15 @@ void FileRepo_del(FileRepo *filerepo)
     HASH_ITER(hh, filerepo->records, record, tmp) {
         HASH_DEL(filerepo->records, record);
         Record_del(record);
+    }
+
+    pfile = filerepo->removals;
+    while (pfile) {
+        PFile *next;
+
+        next = pfile->next;
+        PFile_del(pfile);
+        pfile = next;
     }
 
     free(filerepo);
