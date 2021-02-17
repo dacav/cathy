@@ -8,7 +8,6 @@
 void File_free(File *file)
 {
     free((void *)file->path);
-    free((void *)file->hash);
 }
 
 static
@@ -26,16 +25,10 @@ int File_load_timestamp(File *file)
     return 0;
 }
 
-int File_init(File *file, const char *path, const char *hash)
+int File_init(File *file, const char *path)
 {
     file->path = strdup(path);
     if (!file->path) {
-        warn("strdup");
-        goto fail;
-    }
-
-    file->hash = strdup(hash);
-    if (!file->hash){
         warn("strdup");
         goto fail;
     }
@@ -48,4 +41,13 @@ int File_init(File *file, const char *path, const char *hash)
 fail:
     File_free(file);
     return -1;
+}
+
+void File_objswap(File *f1, File *f2)
+{
+    File aux;
+
+    aux = *f1;
+    *f1 = *f2;
+    *f2 = aux;
 }
