@@ -1,0 +1,10 @@
+- if `cmp file1 file2` returns 0, it might be because the file is *exactly
+  the same*, so unlinking it might cause the file to be lost!
+  tl;dr - verify that `readlink file1` != `readlink file2` before
+  suggesting/calling unlink.
+
+- command line options specify md5sum(1) and cmp(1)
+
+- command line option to authorize file removals
+
+- keep stats (e.g. number of duplicated, prospected freed disk space)
