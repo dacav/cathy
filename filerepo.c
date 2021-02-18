@@ -131,6 +131,15 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
 
     LL_FOREACH(record->unique_files, pfile) {
         bool is_copy;
+
+        if (File_identical(&pfile->file, &new_pfile->file)) {
+            debug("ignoring %s as identical (same inode) to %s",
+                pfile->file.path,
+                new_pfile->file.path);
+            PFile_del(new_pfile);
+            return 0;
+        }
+
         if (Hasher_comp_files(
                 filerepo->hasher,
                 pfile->file.path,

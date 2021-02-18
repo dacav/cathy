@@ -11,7 +11,7 @@ void File_free(File *file)
 }
 
 static
-int File_load_timestamp(File *file)
+int File_load_metadata(File *file)
 {
     struct stat statbuf;
 
@@ -22,6 +22,7 @@ int File_load_timestamp(File *file)
 
     file->mtime = statbuf.st_mtim.tv_sec
                 + statbuf.st_mtim.tv_nsec / 1000000000;
+    file->inode_id = statbuf.st_ino;
     return 0;
 }
 
@@ -33,7 +34,7 @@ int File_init(File *file, const char *path)
         goto fail;
     }
 
-    if (File_load_timestamp(file))
+    if (File_load_metadata(file))
         goto fail;
 
     return 0;
@@ -41,6 +42,11 @@ int File_init(File *file, const char *path)
 fail:
     File_free(file);
     return -1;
+}
+
+bool File_identical(File *f1, File *f2)
+{
+    return f1->inode_id == f2->inode_id;
 }
 
 void File_objswap(File *f1, File *f2)
