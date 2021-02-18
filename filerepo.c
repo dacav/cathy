@@ -160,7 +160,7 @@ int FileRepo_attach_record(FileRepo *filerepo,
     record = malloc(sizeof(Record));
     if (!record) {
         warn("malloc");
-        return -1;
+        goto fail;
     }
 
     *record = (Record){
@@ -170,7 +170,7 @@ int FileRepo_attach_record(FileRepo *filerepo,
 
     if (!record->filehash) {
         warn("strdup");
-        return -1;
+        goto fail;
     }
 
     HASH_ADD_KEYPTR(
@@ -181,6 +181,13 @@ int FileRepo_attach_record(FileRepo *filerepo,
         record);
 
     return 0;
+
+fail:
+    if (record) {
+        free((void *)record->filehash);
+        free(record);
+    }
+    return -1;
 }
 
 int FileRepo_add(FileRepo *filerepo, const char *path)
