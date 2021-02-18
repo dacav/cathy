@@ -12,6 +12,7 @@ typedef struct {
 FileRepo *FileRepo_new(const Hasher *);
 
 const FileRepo_Entry *FileRepo_iter(const FileRepo *, void **aux);
+const File *FileRepo_iter_removals(const FileRepo *, void **aux);
 
 int FileRepo_add(FileRepo *, const char *path);
 

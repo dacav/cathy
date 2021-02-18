@@ -233,7 +233,6 @@ const FileRepo_Entry *FileRepo_iter(const FileRepo *filerepo, void **aux)
     Iter *iter = *aux;
 
     if (iter == NULL) {
-        debug("iter init, %s", filerepo->records ? "has data" : "empty");
         if (!filerepo->records)
             return NULL;    // Empty. Stop immediately.
 
@@ -251,13 +250,11 @@ const FileRepo_Entry *FileRepo_iter(const FileRepo *filerepo, void **aux)
         };
     }
     else if (iter->pfile->next) {
-        debug("iter next, same record");
         iter->pfile = iter->pfile->next;
     } else {
         // Advance record, take the first pfile of the record.
         iter->record = iter->record->hh.next;
 
-        debug("iter next, %s", iter->record ? "advance record" : "end");
         if (!iter->record) {
             // Cannot advance, reached end of iteration.
             free(iter);
@@ -274,6 +271,20 @@ const FileRepo_Entry *FileRepo_iter(const FileRepo *filerepo, void **aux)
         .filehash = iter->record->filehash,
     };
     return &iter->entry;
+}
+
+const File *FileRepo_iter_removals(const FileRepo *filerepo,
+                                             void **aux)
+{
+    PFile *pfile;
+
+    pfile = *aux;
+    if (!pfile)
+        pfile = filerepo->removals;
+    else
+        pfile = pfile->next;
+    *aux = pfile;
+    return &pfile->file;
 }
 
 void FileRepo_del(FileRepo *filerepo)

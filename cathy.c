@@ -13,7 +13,17 @@ void loop_entries(const FileRepo *filerepo)
     const FileRepo_Entry *entry;
 
     while (entry = FileRepo_iter(filerepo, &aux), entry != NULL)
-        warnx("file %s filehash %s", entry->file->path, entry->filehash);
+        warnx("categorize file %s filehash %s", entry->file->path, entry->filehash);
+}
+
+static
+void loop_removals(const FileRepo *filerepo)
+{
+    void *aux = NULL;
+    const File *file;
+
+    while (file = FileRepo_iter_removals(filerepo, &aux), file != NULL)
+        warnx("remove file %s", file->path);
 }
 
 int main(void)
@@ -57,6 +67,7 @@ int main(void)
         ++fails;
 
     loop_entries(filerepo);
+    loop_removals(filerepo);
 
 exit:
     OutDir_free(&outdir);
