@@ -139,7 +139,10 @@ int Hasher_read(const Hasher *hasher, int r)
         buffer += n;
     } while (room && n);
 
-    warnx("invalid hash: %.*s", Hasher_buflen, hasher->buffer);
+    if (n == 0)
+        warnx("invalid hash, zero bytes answer from subcommand");
+    else
+        warnx("invalid hash: %.*s", Hasher_buflen, hasher->buffer);
     return -1;
 }
 
