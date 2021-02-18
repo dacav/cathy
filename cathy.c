@@ -60,7 +60,7 @@ int main(void)
     const char *fname;
     while (fname = IORead_next(&ioread), fname != NULL)
         if (FileRepo_add(filerepo, fname)) {
-            warnx("failure handling %s", fname);
+            warnx("failure while handling %s", fname);
             ++fails;
         }
     if (ioread.errno_s)
