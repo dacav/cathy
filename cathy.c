@@ -14,6 +14,7 @@ typedef struct {
     const char *cmpprg;
     const char *hashprg;
     const char *outdir;
+    bool remove_files;
 } Options;
 
 static
@@ -24,32 +25,36 @@ void usage(const char *prgname, int exval)
         " [-C comparer]"
         " [-H hasher]"
         " [-o outdir]"
+        " -r"
         "\n",
         prgname);
     exit(exval);
 }
 
 static
-void parseopts(int argc, char **argv, Options *outops)
+void parseopts(int argc, char **argv, Options *outopts)
 {
     int opt;
 
-    *outops = (Options){
+    *outopts = (Options){
         .cmpprg = "cmp",
         .hashprg = "sha1sum",
         .outdir = ".",
     };
 
-    while (opt = getopt(argc, argv, "C:hH:o:"), opt != -1) {
+    while (opt = getopt(argc, argv, "C:hH:o:r"), opt != -1) {
         switch (opt) {
         case 'C':
-            outops->cmpprg = optarg;
+            outopts->cmpprg = optarg;
             break;
         case 'H':
-            outops->hashprg = optarg;
+            outopts->hashprg = optarg;
             break;
         case 'o':
-            outops->outdir = optarg;
+            outopts->outdir = optarg;
+            break;
+        case 'r':
+            outopts->remove_files = true;
             break;
         default:
             usage(argv[0], opt == 'h' ? 0 : EX_USAGE);
@@ -71,13 +76,16 @@ void loop_entries(const FileRepo *filerepo, const OutDir *outdir)
 }
 
 static
-void loop_removals(const FileRepo *filerepo)
+void loop_removals(const FileRepo *filerepo, bool remove_files)
 {
     void *aux = NULL;
     const File *file;
 
-    while (file = FileRepo_iter_removals(filerepo, &aux), file != NULL)
-        warnx("remove file %s", file->path);
+    while (file = FileRepo_iter_removals(filerepo, &aux), file != NULL) {
+        warnx("%s file %s", remove_files ? "removing" : "would remove", file->path);
+        if (remove_files)
+            unlink(file->path);
+    }
 }
 
 int main(int argc, char **argv)
@@ -120,7 +128,7 @@ int main(int argc, char **argv)
     }
 
     loop_entries(filerepo, outdir);
-    loop_removals(filerepo);
+    loop_removals(filerepo, opts.remove_files);
 
 exit:
     OutDir_del(outdir);
