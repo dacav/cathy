@@ -2,11 +2,8 @@
 
 #include <stddef.h>
 
-typedef struct {
-    int hashdir;
-    size_t hashlen;
-} OutDir;
+typedef struct OutDir OutDir;
 
-int OutDir_init(OutDir *outdir, const char *path);
+OutDir *OutDir_new(const char *path);
 int OutDir_link(const OutDir *outdir, const char *hash, const char *path);
-void OutDir_free(OutDir *outdir);
+void OutDir_del(OutDir *outdir);

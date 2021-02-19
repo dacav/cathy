@@ -12,13 +12,21 @@
 #include "outdir.h"
 #include "util.h"
 
+struct OutDir {
+    int hashdir;
+};
+
 enum {
     OutDir_PREFIX = 5,
 };
 
-void OutDir_free(OutDir *outdir)
+void OutDir_del(OutDir *outdir)
 {
+    if (!outdir)
+        return;
+
     Util_fdclose(&outdir->hashdir);
+    free(outdir);
 }
 
 static
@@ -31,9 +39,16 @@ int OutDir_mkdir(int dirfd, const char *path)
     return 0;
 }
 
-int OutDir_init(OutDir *outdir, const char *path)
+OutDir *OutDir_new(const char *path)
 {
-    int basedir;
+    int basedir = -1;
+    OutDir *outdir;
+
+    outdir = malloc(sizeof(OutDir));
+    if (!outdir) {
+        warn("malloc");
+        goto fail;
+    }
 
     *outdir = (OutDir){
         .hashdir = -1,
@@ -54,12 +69,12 @@ int OutDir_init(OutDir *outdir, const char *path)
         goto fail;
 
     Util_fdclose(&basedir);
-    return 0;
+    return outdir;
 
 fail:
-    OutDir_free(outdir);
     Util_fdclose(&basedir);
-    return -1;
+    OutDir_del(outdir);
+    return NULL;
 }
 
 static
