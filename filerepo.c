@@ -134,8 +134,8 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
 
         if (File_identical(&pfile->file, &new_pfile->file)) {
             debug("ignoring %s as identical (same inode) to %s",
-                pfile->file.path,
-                new_pfile->file.path);
+                new_pfile->file.path,
+                pfile->file.path);
             PFile_del(new_pfile);
             return 0;
         }
