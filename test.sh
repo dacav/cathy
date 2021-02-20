@@ -2,8 +2,32 @@
 
 set -e
 
+echo >&2 "# NOTE: logging in test.log"
+exec 3>test.log
+failures=
+next_test_id=
+
+tree() {
+    if command -v tree; then
+        command tree "$@"
+    else
+        ls -lR "$@"
+    fi
+}
+
 atexit() {
-    [ -z "$tmpdir" ] || rm -rf "$tmpdir"
+    [ -z "$failures" ] || echo >&2 "registered $failures failures"
+
+    printf >&3 "== EXIT ==\n"
+
+    if [ "$tmpdir" ]; then
+        exec 1>&3 2>&3
+        set -x
+        tree "$tmpdir"
+        rm -rf "$tmpdir"
+    fi
+
+    exit ${failures:-0}
 }
 trap atexit EXIT
 
@@ -25,7 +49,7 @@ mkfile() {
 
 duplicate() {
     [ "$1" ] || return
-    cp "$filehier/$1" "$filehier/$1.duplicate"
+    cp -a "$filehier/$1" "$filehier/$1.duplicate"
     listout "$filehier/$1.duplicate"
 }
 
@@ -48,29 +72,142 @@ softlink() (
     listout "$filehier/$1.softlink"
 )
 
+exists() {
+    test -e "$filehier/$1"
+}
+
+is_hashed() {
+    set -x
+    local file
+
+    file="$filehier/${1:?}"
+    find "$tmpdir/by-hash" -type l |
+        while read -r link; do
+            link="$(realpath -e "$link")" || return
+            [ "$file" = "$link" ] && {
+                echo 1
+                break
+            }
+        done |
+        grep -q 1
+}
+
+diag() {
+    if [ "$1" ]; then
+        printf %s\\n "$*" | sed 's/^/# /'
+    else
+        sed 's/^/# /'
+    fi
+} >&2
+
+begin_test() {
+    if [ "$next_test_id" ]; then
+        diag "------ END TEST $next_test_id ------"
+    fi
+    next_test_id=$((next_test_id + 1))
+    diag "------ TEST $next_test_id: $* ------"
+}
+
 ok() {
     local result="fail"
 
-    if "$@" 2>&3; then
+    printf >&3 "\n== ok: %s ==\n" "$*"
+    if ( set -x; "$@" ) 2>&3; then
         result="ok"
+    else
+        failures=$((failures + 1))
     fi
 
     printf >&2 "%s - %s\n" $result "$*"
 }
 
-build_filetree() {
-    mkfile foo.jpeg
-    hardlink foo.jpeg
-    softlink foo.jpeg
-    mkfile bar.mpv
-    duplicate bar.mpv
-    duplicate foo.jpeg
-    change_mtime foo.jpeg
+fail() {
+    local result="fail"
+
+    printf >&3 "\n== fail: %s ==\n" "$*"
+    if ( set -x; "$@" ) 2>&3; then
+        failures=$((failures + 1))
+    else
+        result="ok"
+    fi
+
+    printf >&2 "%s - ! %s\n" $result "$*"
 }
 
-echo >&2 "NOTE: logging in test.log"
-exec 3>test.log
+ok_cathy() (
+    diag Run cathy with a clean tree
+    cd "$tmpdir"
+    rm -rf ./by-hash
+    ok cathy -r <./input
+)
 
-cd $tmpdir
-ok build_filetree > input
-ok cathy < ./input
+# The file descriptor 4 is later used to feed cathy with the equivalent of
+# a find hier -print0.
+exec 4>"$tmpdir/input"
+
+# -----------------------------------------------------------------------
+begin_test LINKS
+# -----------------------------------------------------------------------
+ok mkfile foo.jpeg >&4
+ok hardlink foo.jpeg >&4
+ok softlink foo.jpeg >&4
+ok_cathy
+
+diag <<END
+All files exists, since they share the same inode, so no space
+is claimed by their removal.
+END
+ok exists foo.jpeg
+ok exists foo.jpeg.hardlink
+ok exists foo.jpeg.softlink
+
+diag <<END
+Only one of the files is hashed, that is the first one listed to
+cathy.
+END
+ok is_hashed foo.jpeg
+fail is_hashed foo.jpeg.hardlink
+fail is_hashed foo.jpeg.softlink
+
+# -----------------------------------------------------------------------
+begin_test DUPLICATES
+# -----------------------------------------------------------------------
+diag <<END
+We duplicate a file and verify that cathy removes it in favour of the
+original copy, which is listed first to cathy's stdin.
+END
+ok duplicate foo.jpeg >&4
+ok exists foo.jpeg.duplicate
+ok_cathy
+fail exists foo.jpeg.duplicate
+
+diag <<END
+As in the previous test, only the original (first listed) file is hashed,
+and nothing else (especially the duplicate, which no longer exists).
+END
+ok is_hashed foo.jpeg
+fail is_hashed foo.jpeg.hardlink
+fail is_hashed foo.jpeg.softlink
+fail is_hashed foo.jpeg.duplicate
+
+# -----------------------------------------------------------------------
+begin_test ALWAYS KEEP THE OLDEST
+# -----------------------------------------------------------------------
+diag <<END
+We duplicate a file and then move forward the timestamp of the original
+one.  Now, even if the original file is listed to cathy's stdin before the
+copy, the original is removed, since it is newer than the copy, according
+to its modification time (mtime).
+END
+ok duplicate foo.jpeg >&4
+ok exists foo.jpeg.duplicate
+ok change_mtime foo.jpeg
+ok_cathy
+
+diag<<END
+The foo.jpeg.duplicate file is hashed, while the original foo.jpeg
+(which is removed, by previous test) is of course not hashed.
+END
+fail exists foo.jpeg
+ok is_hashed foo.jpeg.duplicate
+fail is_hashed foo.jpeg

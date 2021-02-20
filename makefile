@@ -4,6 +4,10 @@ binaries := cathy
 
 cathy: cathy.o file.o filerepo.o hasher.o ioread.o outdir.o util.o
 
+PATH := ${PWD}:${PATH}
+test: $(binaries)
+	sh test.sh
+
 .PHONY: all
 all: $(binaries)
 
