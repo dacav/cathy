@@ -7,6 +7,7 @@
 typedef struct File {
     const char *path;
     time_t mtime;
+    dev_t device_id;
     ino_t inode_id;
 } File;
 

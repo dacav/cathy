@@ -40,6 +40,7 @@ int File_init(File *file, const char *path)
         .path = path_copy,
         .mtime = statbuf.st_mtim.tv_sec
                + statbuf.st_mtim.tv_nsec / 1000000000,
+        .device_id = statbuf.st_dev,
         .inode_id = statbuf.st_ino,
     };
 
@@ -52,7 +53,8 @@ fail:
 
 bool File_identical(File *f1, File *f2)
 {
-    return f1->inode_id == f2->inode_id;
+    return f1->inode_id == f2->inode_id
+        && f1->device_id == f2->device_id;
 }
 
 void File_objswap(File *f1, File *f2)

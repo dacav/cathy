@@ -133,7 +133,7 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
         bool is_copy;
 
         if (File_identical(&pfile->file, &new_pfile->file)) {
-            debug("ignoring %s as identical (same inode) to %s",
+            debug("ignoring %s as identical (same device/inode) to %s",
                 new_pfile->file.path,
                 pfile->file.path);
             PFile_del(new_pfile);
