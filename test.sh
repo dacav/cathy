@@ -16,14 +16,15 @@ tree() {
 }
 
 atexit() {
-    [ -z "$failures" ] || echo >&2 "registered $failures failures"
+    if [ "$failures" ]; then
+        echo >&2 "registered $failures failures"
+    else
+        echo >&2 "SUCCESS!"
+    fi
 
     printf >&3 "== EXIT ==\n"
 
     if [ "$tmpdir" ]; then
-        exec 1>&3 2>&3
-        set -x
-        tree "$tmpdir"
         rm -rf "$tmpdir"
     fi
 
