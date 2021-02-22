@@ -10,37 +10,33 @@ void File_free(File *file)
     free((void *)file->path);
 }
 
-static
-int File_load_metadata(File *file)
-{
-    struct stat statbuf;
-
-    if (stat(file->path, &statbuf) == -1) {
-        warn("stat(%s, ...)", file->path);
-        return -1;
-    }
-
-    file->mtime = statbuf.st_mtim.tv_sec
-                + statbuf.st_mtim.tv_nsec / 1000000000;
-    file->inode_id = statbuf.st_ino;
-    return 0;
-}
-
 int File_init(File *file, const char *path)
 {
-    file->path = strdup(path);
-    if (!file->path) {
+    struct stat statbuf;
+    const char *path_copy = NULL;
+
+    if (stat(path, &statbuf) == -1) {
+        warn("stat(%s, ...)", path);
+        goto fail;
+    }
+
+    path_copy = strdup(path);
+    if (!path_copy) {
         warn("strdup");
         goto fail;
     }
 
-    if (File_load_metadata(file))
-        goto fail;
+    *file = (File){
+        .path = path_copy,
+        .mtime = statbuf.st_mtim.tv_sec
+               + statbuf.st_mtim.tv_nsec / 1000000000,
+        .inode_id = statbuf.st_ino,
+    };
 
     return 0;
 
 fail:
-    File_free(file);
+    free((void *)path_copy);
     return -1;
 }
 
