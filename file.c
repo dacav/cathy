@@ -20,6 +20,16 @@ int File_init(File *file, const char *path)
         goto fail;
     }
 
+    switch (statbuf.st_mode & S_IFMT) {
+    case S_IFREG:
+    case S_IFLNK:
+        break;
+
+    default:
+        warnx("Skip '%s': not a (regular) file or softlink", path);
+        goto fail;
+    }
+
     path_copy = strdup(path);
     if (!path_copy) {
         warn("strdup");

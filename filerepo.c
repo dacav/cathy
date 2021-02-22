@@ -204,12 +204,12 @@ int FileRepo_add(FileRepo *filerepo, const char *path)
     PFile *pfile = NULL;
     const char *filehash;
 
-    filehash = Hasher_hash_file(filerepo->hasher, path);
-    if (!filehash)
-        goto fail;
-
     pfile = PFile_new(path);
     if (!pfile)
+        goto fail;
+
+    filehash = Hasher_hash_file(filerepo->hasher, path);
+    if (!filehash)
         goto fail;
 
     if (FileRepo_attach_record(filerepo, filehash, pfile))
