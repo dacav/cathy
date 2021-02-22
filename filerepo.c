@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sysexits.h>
-
 #include <uthash.h>
 #include <utlist.h>
+#include <string.h>
 
 #define debug(...) warnx(__VA_ARGS__)
 

@@ -1,3 +1,5 @@
+#include "outdir.h"
+
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
@@ -8,8 +10,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stddef.h>
 
-#include "outdir.h"
 #include "util.h"
 
 struct OutDir {

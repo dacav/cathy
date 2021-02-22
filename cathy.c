@@ -9,6 +9,7 @@
 #include "hasher.h"
 #include "ioread.h"
 #include "outdir.h"
+#include "file.h"
 
 typedef struct {
     const char *cmpprg;
