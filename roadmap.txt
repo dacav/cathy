@@ -2,4 +2,10 @@
 
 - command line option to authorize file removals
 
-- keep stats (e.g. number of duplicated, prospected freed disk space)
+- keep stats
+ - nr.duplicates
+ - ignored softlinks
+ - ignored hardinks
+ - freed space
+
+- test (unlikely) file collision by using mocky cmp program
