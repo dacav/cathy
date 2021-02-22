@@ -8,27 +8,27 @@ failures=
 next_test_id=
 
 tree() {
-    if command -v tree; then
-        command tree "$@"
-    else
-        ls -lR "$@"
-    fi
+	if command -v tree; then
+		command tree "$@"
+	else
+		ls -lR "$@"
+	fi
 }
 
 atexit() {
-    if [ "$failures" ]; then
-        echo >&2 "registered $failures failures"
-    else
-        echo >&2 "SUCCESS!"
-    fi
+	if [ "$failures" ]; then
+		echo >&2 "registered $failures failures"
+	else
+		echo >&2 "SUCCESS!"
+	fi
 
-    printf >&3 "== EXIT ==\n"
+	printf >&3 "== EXIT ==\n"
 
-    if [ "$tmpdir" ]; then
-        rm -rf "$tmpdir"
-    fi
+	if [ "$tmpdir" ]; then
+		rm -rf "$tmpdir"
+	fi
 
-    exit ${failures:-0}
+	exit ${failures:-0}
 }
 trap atexit EXIT
 
@@ -38,108 +38,108 @@ filehier="$tmpdir/hier"
 mkdir "$filehier"
 
 listout() {
-    [ "$1" ] || return
-    printf "%s\0" "$@"
+	[ "$1" ] || return
+	printf "%s\0" "$@"
 }
 
 mkfile() {
-    [ "$1" ] || return
-    printf "%s\n" "$1" > "$filehier/$1"
-    listout "$filehier/$1"
+	[ "$1" ] || return
+	printf "%s\n" "$1" > "$filehier/$1"
+	listout "$filehier/$1"
 }
 
 duplicate() {
-    [ "$1" ] || return
-    cp -a "$filehier/$1" "$filehier/$1.duplicate"
-    listout "$filehier/$1.duplicate"
+	[ "$1" ] || return
+	cp -a "$filehier/$1" "$filehier/$1.duplicate"
+	listout "$filehier/$1.duplicate"
 }
 
 change_mtime() {
-    sleep 1
-    touch "$filehier/$1"
+	sleep 1
+	touch "$filehier/$1"
 }
 
 hardlink() (
-    [ "$1" ] || return
-    cd "$filehier"
-    ln "$1" "$1.hardlink"
-    listout "$filehier/$1.hardlink"
+	[ "$1" ] || return
+	cd "$filehier"
+	ln "$1" "$1.hardlink"
+	listout "$filehier/$1.hardlink"
 )
 
 softlink() (
-    [ "$1" ] || return
-    cd "$filehier"
-    ln -s "$1" "$1.softlink"
-    listout "$filehier/$1.softlink"
+	[ "$1" ] || return
+	cd "$filehier"
+	ln -s "$1" "$1.softlink"
+	listout "$filehier/$1.softlink"
 )
 
 exists() {
-    test -e "$filehier/$1"
+	test -e "$filehier/$1"
 }
 
 is_hashed() {
-    set -x
-    local file
+	set -x
+	local file
 
-    file="$filehier/${1:?}"
-    find "$tmpdir/by-hash" -type l |
-        while read -r link; do
-            link="$(realpath -e "$link")" || return
-            [ "$file" = "$link" ] && {
-                echo 1
-                break
-            }
-        done |
-        grep -q 1
+	file="$filehier/${1:?}"
+	find "$tmpdir/by-hash" -type l |
+		while read -r link; do
+			link="$(realpath -e "$link")" || return
+			[ "$file" = "$link" ] && {
+				echo 1
+				break
+			}
+		done |
+		grep -q 1
 }
 
 diag() {
-    if [ "$1" ]; then
-        printf %s\\n "$*" | sed 's/^/# /'
-    else
-        sed 's/^/# /'
-    fi
+	if [ "$1" ]; then
+		printf %s\\n "$*" | sed 's/^/# /'
+	else
+		sed 's/^/# /'
+	fi
 } >&2
 
 begin_test() {
-    if [ "$next_test_id" ]; then
-        diag "------ END TEST $next_test_id ------"
-    fi
-    next_test_id=$((next_test_id + 1))
-    diag "------ TEST $next_test_id: $* ------"
+	if [ "$next_test_id" ]; then
+		diag "------ END TEST $next_test_id ------"
+	fi
+	next_test_id=$((next_test_id + 1))
+	diag "------ TEST $next_test_id: $* ------"
 }
 
 ok() {
-    local result="fail"
+	local result="fail"
 
-    printf >&3 "\n== ok: %s ==\n" "$*"
-    if ( set -x; "$@" ) 2>&3; then
-        result="ok"
-    else
-        failures=$((failures + 1))
-    fi
+	printf >&3 "\n== ok: %s ==\n" "$*"
+	if ( set -x; "$@" ) 2>&3; then
+		result="ok"
+	else
+		failures=$((failures + 1))
+	fi
 
-    printf >&2 "%s - %s\n" $result "$*"
+	printf >&2 "%s - %s\n" $result "$*"
 }
 
 fail() {
-    local result="fail"
+	local result="fail"
 
-    printf >&3 "\n== fail: %s ==\n" "$*"
-    if ( set -x; "$@" ) 2>&3; then
-        failures=$((failures + 1))
-    else
-        result="ok"
-    fi
+	printf >&3 "\n== fail: %s ==\n" "$*"
+	if ( set -x; "$@" ) 2>&3; then
+		failures=$((failures + 1))
+	else
+		result="ok"
+	fi
 
-    printf >&2 "%s - ! %s\n" $result "$*"
+	printf >&2 "%s - ! %s\n" $result "$*"
 }
 
 ok_cathy() (
-    diag Run cathy with a clean tree
-    cd "$tmpdir"
-    rm -rf ./by-hash
-    ok cathy -r <./input
+	diag Run cathy with a clean tree
+	cd "$tmpdir"
+	rm -rf ./by-hash
+	ok cathy -r <./input
 )
 
 # The file descriptor 4 is later used to feed cathy with the equivalent of
