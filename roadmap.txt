@@ -1,7 +1,3 @@
-- command line options specify md5sum(1) and cmp(1)
-
-- command line option to authorize file removals
-
 - keep stats
  - nr.duplicates
  - ignored softlinks
