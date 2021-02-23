@@ -1,9 +1,9 @@
 #include "counters.h"
 
-#include <stdio.h>
+#include <err.h>
 
 #define print(counters, field, fmt) \
-    fprintf(stderr, #field ": " fmt "\n", (counters)->field);
+    warnx(#field ": " fmt "\n", (counters)->field);
 
 void Counters_print(const Counters *counters)
 {
