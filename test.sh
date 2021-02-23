@@ -101,10 +101,19 @@ diag() {
 	fi
 } >&2
 
+reset() {
+    rm -rf "$tmpdir/*"
+
+	# The file descriptor 4 is later used to feed cathy with the
+	# equivalent of a find hier -print0.
+	exec 4>"$tmpdir/input"
+}
+
 begin_test() {
 	if [ "$next_test_id" ]; then
 		diag "------ END TEST $next_test_id ------"
 	fi
+	reset
 	next_test_id=$((next_test_id + 1))
 	diag "------ TEST $next_test_id: $* ------"
 }
@@ -142,73 +151,79 @@ ok_cathy() (
 	ok cathy -r <./input
 )
 
-# The file descriptor 4 is later used to feed cathy with the equivalent of
-# a find hier -print0.
-exec 4>"$tmpdir/input"
+test_links() {
+	begin_test LINKS
 
-# -----------------------------------------------------------------------
-begin_test LINKS
-# -----------------------------------------------------------------------
-ok mkfile foo.jpeg >&4
-ok hardlink foo.jpeg >&4
-ok softlink foo.jpeg >&4
-ok_cathy
+	ok mkfile foo.jpeg >&4
+	ok hardlink foo.jpeg >&4
+	ok softlink foo.jpeg >&4
+	ok_cathy
 
-diag <<END
-All files exists, since they share the same inode, so no space
-is claimed by their removal.
-END
-ok exists foo.jpeg
-ok exists foo.jpeg.hardlink
-ok exists foo.jpeg.softlink
+	diag <<-END
+	All files exists, since they share the same inode, so no space
+	is claimed by their removal.
+	END
+	ok exists foo.jpeg
+	ok exists foo.jpeg.hardlink
+	ok exists foo.jpeg.softlink
 
-diag <<END
-Only one of the files is hashed, that is the first one listed to
-cathy.
-END
-ok is_hashed foo.jpeg
-fail is_hashed foo.jpeg.hardlink
-fail is_hashed foo.jpeg.softlink
+	diag <<-END
+	Only one of the files is hashed, that is the first one listed to
+	cathy.
+	END
+	ok is_hashed foo.jpeg
+	fail is_hashed foo.jpeg.hardlink
+	fail is_hashed foo.jpeg.softlink
+}
 
-# -----------------------------------------------------------------------
-begin_test DUPLICATES
-# -----------------------------------------------------------------------
-diag <<END
-We duplicate a file and verify that cathy removes it in favour of the
-original copy, which is listed first to cathy's stdin.
-END
-ok duplicate foo.jpeg >&4
-ok exists foo.jpeg.duplicate
-ok_cathy
-fail exists foo.jpeg.duplicate
+test_duplicates() {
+	begin_test DUPLICATES
 
-diag <<END
-As in the previous test, only the original (first listed) file is hashed,
-and nothing else (especially the duplicate, which no longer exists).
-END
-ok is_hashed foo.jpeg
-fail is_hashed foo.jpeg.hardlink
-fail is_hashed foo.jpeg.softlink
-fail is_hashed foo.jpeg.duplicate
+	diag <<-END
+	ok mkfile foo.jpeg >&4
+	We duplicate a file and verify that cathy removes it in favour of the
+	original copy, which is listed first to cathy's stdin.
+	END
+	ok mkfile foo.jpeg >&4
+	ok duplicate foo.jpeg >&4
+	ok exists foo.jpeg.duplicate
+	ok_cathy
+	fail exists foo.jpeg.duplicate
 
-# -----------------------------------------------------------------------
-begin_test ALWAYS KEEP THE OLDEST
-# -----------------------------------------------------------------------
-diag <<END
-We duplicate a file and then move forward the timestamp of the original
-one.  Now, even if the original file is listed to cathy's stdin before the
-copy, the original is removed, since it is newer than the copy, according
-to its modification time (mtime).
-END
-ok duplicate foo.jpeg >&4
-ok exists foo.jpeg.duplicate
-ok change_mtime foo.jpeg
-ok_cathy
+	diag <<-END
+	As in the previous test, only the original (first listed) file is hashed,
+	and nothing else (especially the duplicate, which no longer exists).
+	END
+	ok is_hashed foo.jpeg
+	fail is_hashed foo.jpeg.hardlink
+	fail is_hashed foo.jpeg.softlink
+	fail is_hashed foo.jpeg.duplicate
+}
 
-diag<<END
-The foo.jpeg.duplicate file is hashed, while the original foo.jpeg
-(which is removed, by previous test) is of course not hashed.
-END
-fail exists foo.jpeg
-ok is_hashed foo.jpeg.duplicate
-fail is_hashed foo.jpeg
+test_always_keep_the_oldest() {
+	begin_test ALWAYS KEEP THE OLDEST
+
+	diag <<-END
+	We duplicate a file and then move forward the timestamp of the original
+	one.  Now, even if the original file is listed to cathy's stdin before the
+	copy, the original is removed, since it is newer than the copy, according
+	to its modification time (mtime).
+	END
+	ok mkfile foo.jpeg >&4
+	ok duplicate foo.jpeg >&4
+	ok exists foo.jpeg.duplicate
+	ok change_mtime foo.jpeg
+	ok_cathy
+
+	diag<<-END
+	The foo.jpeg.duplicate file is hashed, while the original foo.jpeg
+	(which is removed, by previous test) is of course not hashed.
+	END
+	fail exists foo.jpeg
+	ok is_hashed foo.jpeg.duplicate
+	fail is_hashed foo.jpeg
+}
+
+test_links
+test_duplicates
+test_always_keep_the_oldest
