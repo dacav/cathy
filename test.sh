@@ -32,10 +32,17 @@ atexit() {
 }
 trap atexit EXIT
 
-tmpdir="$(mktemp -d)"
+reset() {
+	[ -z "$tmpdir" ] || rm -rf "$tmpdir"
 
-filehier="$tmpdir/hier"
-mkdir "$filehier"
+	tmpdir="$(mktemp -d)"
+	filehier="$tmpdir/hier"
+	mkdir "$filehier"
+
+	# The file descriptor 4 is later used to feed cathy with the
+	# equivalent of a find hier -print0.
+	exec 4>"$tmpdir/input"
+}
 
 listout() {
 	[ "$1" ] || return
@@ -101,21 +108,15 @@ diag() {
 	fi
 } >&2
 
-reset() {
-    rm -rf "$tmpdir/*"
-
-	# The file descriptor 4 is later used to feed cathy with the
-	# equivalent of a find hier -print0.
-	exec 4>"$tmpdir/input"
-}
-
-begin_test() {
+run() {
 	if [ "$next_test_id" ]; then
 		diag "------ END TEST $next_test_id ------"
 	fi
 	reset
 	next_test_id=$((next_test_id + 1))
 	diag "------ TEST $next_test_id: $* ------"
+
+    "$@"
 }
 
 ok() {
@@ -147,13 +148,10 @@ fail() {
 ok_cathy() (
 	diag Run cathy with a clean tree
 	cd "$tmpdir"
-	rm -rf ./by-hash
 	ok cathy -r <./input
 )
 
 test_links() {
-	begin_test LINKS
-
 	ok mkfile foo.jpeg >&4
 	ok hardlink foo.jpeg >&4
 	ok softlink foo.jpeg >&4
@@ -177,8 +175,6 @@ test_links() {
 }
 
 test_duplicates() {
-	begin_test DUPLICATES
-
 	diag <<-END
 	ok mkfile foo.jpeg >&4
 	We duplicate a file and verify that cathy removes it in favour of the
@@ -201,8 +197,6 @@ test_duplicates() {
 }
 
 test_always_keep_the_oldest() {
-	begin_test ALWAYS KEEP THE OLDEST
-
 	diag <<-END
 	We duplicate a file and then move forward the timestamp of the original
 	one.  Now, even if the original file is listed to cathy's stdin before the
@@ -224,6 +218,6 @@ test_always_keep_the_oldest() {
 	fail is_hashed foo.jpeg
 }
 
-test_links
-test_duplicates
-test_always_keep_the_oldest
+run test_links
+run test_duplicates
+run test_always_keep_the_oldest
