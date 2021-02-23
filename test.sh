@@ -157,9 +157,9 @@ cathy() (
 
 test_links() {
 	{
-		ok mkfile foo.jpeg
-		ok hardlink foo.jpeg
-		ok softlink foo.jpeg
+		mkfile foo.jpeg
+		hardlink foo.jpeg
+		softlink foo.jpeg
 	} | ok cathy -r
 
 	diag <<-END
@@ -186,8 +186,8 @@ test_duplicates() {
 	END
 
 	{
-		ok mkfile foo.jpeg
-		ok duplicate foo.jpeg
+		mkfile foo.jpeg
+		duplicate foo.jpeg
 	} >"$tmpdir/input"
 
 	ok exists foo.jpeg.duplicate
@@ -212,8 +212,8 @@ test_always_keep_the_oldest() {
 	to its modification time (mtime).
 	END
 	{
-		ok mkfile foo.jpeg
-		ok duplicate foo.jpeg
+		mkfile foo.jpeg
+		duplicate foo.jpeg
 	} >"$tmpdir/input"
 	ok exists foo.jpeg.duplicate
 	ok change_mtime foo.jpeg
@@ -223,9 +223,10 @@ test_always_keep_the_oldest() {
 	The foo.jpeg.duplicate file is hashed, while the original foo.jpeg
 	(which is removed, by previous test) is of course not hashed.
 	END
-	fail exists foo.jpeg
-	ok is_hashed foo.jpeg.duplicate
 	fail is_hashed foo.jpeg
+	fail exists foo.jpeg
+	ok exists foo.jpeg.duplicate
+	ok is_hashed foo.jpeg.duplicate
 }
 
 run test_links
