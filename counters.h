@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef struct Counters
 {
@@ -8,4 +9,4 @@ typedef struct Counters
     unsigned removed_files;
 } Counters;
 
-void Counters_print(const Counters *counters);
+void Counters_print(const Counters *counters, bool dry_run);

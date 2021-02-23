@@ -137,7 +137,7 @@ int main(int argc, char **argv)
     loop_entries(filerepo, outdir);
     loop_removals(filerepo, &counters, opts.remove_files);
 
-    Counters_print(&counters);
+    Counters_print(&counters, !opts.remove_files);
 
 exit:
     OutDir_del(outdir);
