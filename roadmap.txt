@@ -2,4 +2,6 @@
  - ignored softlinks
  - ignored hardinks
 
+- handle the case of re-scan of output directory
+- hierarchy by time, y/m/d
 - test (unlikely) file collision by using mocky cmp program
