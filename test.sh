@@ -145,17 +145,16 @@ fail() {
 	printf >&2 "%s - ! %s\n" $result "$*"
 }
 
-ok_cathy() (
-	diag Run cathy with a clean tree
+cathy() (
 	cd "$tmpdir"
-	ok cathy -r <./input
+	command cathy "$@" <./input
 )
 
 test_links() {
 	ok mkfile foo.jpeg >&4
 	ok hardlink foo.jpeg >&4
 	ok softlink foo.jpeg >&4
-	ok_cathy
+	ok cathy -r
 
 	diag <<-END
 	All files exists, since they share the same inode, so no space
@@ -183,7 +182,7 @@ test_duplicates() {
 	ok mkfile foo.jpeg >&4
 	ok duplicate foo.jpeg >&4
 	ok exists foo.jpeg.duplicate
-	ok_cathy
+	ok cathy -r
 	fail exists foo.jpeg.duplicate
 
 	diag <<-END
@@ -207,7 +206,7 @@ test_always_keep_the_oldest() {
 	ok duplicate foo.jpeg >&4
 	ok exists foo.jpeg.duplicate
 	ok change_mtime foo.jpeg
-	ok_cathy
+	ok cathy -r
 
 	diag<<-END
 	The foo.jpeg.duplicate file is hashed, while the original foo.jpeg
