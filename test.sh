@@ -22,8 +22,6 @@ atexit() {
 		echo >&2 "SUCCESS!"
 	fi
 
-	printf >&3 "== EXIT ==\n"
-
 	if [ "$tmpdir" ]; then
 		rm -rf "$tmpdir"
 	fi
@@ -120,29 +118,33 @@ run() {
 }
 
 ok() {
-	local result="fail"
+	local result
 
-	printf >&3 "\n== ok: %s ==\n" "$*"
+	printf >&3 "\n== %s ==\n" "$*"
 	if ( set -x; "$@" ) 2>&3; then
-		result="ok"
+		result=ok
 	else
+        result=fail
 		failures=$((failures + 1))
+        printf "** TEST FAILED! **\n" >&3
 	fi
 
 	printf >&2 "%s - %s\n" $result "$*"
 }
 
 fail() {
-	local result="fail"
+	local result
 
-	printf >&3 "\n== fail: %s ==\n" "$*"
+	printf >&3 "\n== !(%s) ==\n" "$*"
 	if ( set -x; "$@" ) 2>&3; then
+        result=fail
 		failures=$((failures + 1))
+        printf "** TEST FAILED! **\n" >&3
 	else
-		result="ok"
+		result=ok
 	fi
 
-	printf >&2 "%s - ! %s\n" $result "$*"
+	printf >&2 "%s - !(%s)\n" $result "$*"
 }
 
 cathy() (
