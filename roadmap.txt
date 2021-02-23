@@ -1,7 +1,5 @@
 - keep stats
- - nr.duplicates
  - ignored softlinks
  - ignored hardinks
- - freed space
 
 - test (unlikely) file collision by using mocky cmp program

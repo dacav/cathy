@@ -8,6 +8,8 @@
 #include <utlist.h>
 #include <string.h>
 
+#include "counters.h"
+
 #define debug(...) warnx(__VA_ARGS__)
 
 typedef struct PFile {
@@ -24,6 +26,7 @@ typedef struct {
 struct FileRepo {
     Record *records;
     const Hasher *hasher;
+    Counters *counters;
     PFile *removals;
 };
 
@@ -79,7 +82,7 @@ void Record_del(Record *record)
     free(record);
 }
 
-FileRepo *FileRepo_new(const Hasher *hasher)
+FileRepo *FileRepo_new(const Hasher *hasher, Counters *counters)
 {
     FileRepo *filerepo;
 
@@ -91,6 +94,7 @@ FileRepo *FileRepo_new(const Hasher *hasher)
 
     *filerepo = (FileRepo){
         .hasher = hasher,
+        .counters = counters,
     };
 
     return filerepo;

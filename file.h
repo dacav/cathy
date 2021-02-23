@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -9,6 +10,7 @@ typedef struct File {
     time_t mtime;
     dev_t device_id;
     ino_t inode_id;
+    off_t size;
 } File;
 
 int File_init(File *, const char *path);

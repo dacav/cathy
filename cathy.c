@@ -5,11 +5,12 @@
 #include <sysexits.h>
 #include <unistd.h>
 
+#include "counters.h"
+#include "file.h"
 #include "filerepo.h"
 #include "hasher.h"
 #include "ioread.h"
 #include "outdir.h"
-#include "file.h"
 
 typedef struct {
     const char *cmpprg;
@@ -77,7 +78,9 @@ void loop_entries(const FileRepo *filerepo, const OutDir *outdir)
 }
 
 static
-void loop_removals(const FileRepo *filerepo, bool remove_files)
+void loop_removals(const FileRepo *filerepo,
+                   Counters *counters,
+                   bool remove_files)
 {
     void *aux = NULL;
     const File *file;
@@ -86,6 +89,8 @@ void loop_removals(const FileRepo *filerepo, bool remove_files)
         warnx("%s file %s", remove_files ? "removing" : "would remove", file->path);
         if (remove_files)
             unlink(file->path);
+        counters->removed_files += 1;
+        counters->freed_space += file->size;
     }
 }
 
@@ -98,6 +103,7 @@ int main(int argc, char **argv)
     OutDir *outdir = NULL;
     int fails = 0;
     const char *fname;
+    Counters counters;
 
     parseopts(argc, argv, &opts);
 
@@ -107,7 +113,7 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    filerepo = FileRepo_new(hash);
+    filerepo = FileRepo_new(hash, &counters);
     if (!filerepo) {
         ++fails;
         goto exit;
@@ -129,7 +135,9 @@ int main(int argc, char **argv)
     }
 
     loop_entries(filerepo, outdir);
-    loop_removals(filerepo, opts.remove_files);
+    loop_removals(filerepo, &counters, opts.remove_files);
+
+    Counters_print(&counters);
 
 exit:
     OutDir_del(outdir);

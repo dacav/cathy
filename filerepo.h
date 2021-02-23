@@ -9,7 +9,9 @@ typedef struct {
     const char *filehash;
 } FileRepo_Entry;
 
-FileRepo *FileRepo_new(const Hasher *);
+struct Counters;
+
+FileRepo *FileRepo_new(const Hasher *, struct Counters *);
 
 const FileRepo_Entry *FileRepo_iter(const FileRepo *, void **aux);
 const File *FileRepo_iter_removals(const FileRepo *, void **aux);

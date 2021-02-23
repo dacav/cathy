@@ -42,6 +42,7 @@ int File_init(File *file, const char *path)
                + statbuf.st_mtim.tv_nsec / 1000000000,
         .device_id = statbuf.st_dev,
         .inode_id = statbuf.st_ino,
+        .size = statbuf.st_size,
     };
 
     return 0;
