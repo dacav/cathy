@@ -16,14 +16,21 @@ tree() {
 }
 
 atexit() {
-	if [ "$failures" ]; then
-		echo >&2 "registered $failures failures"
-	else
-		echo >&2 "SUCCESS!"
-	fi
+	local e="$?"
 
 	if [ "$tmpdir" ]; then
 		rm -rf "$tmpdir"
+	fi
+
+	if [ "$e" != 0 ]; then
+		echo >&2 "command failed"
+		exit 1
+	fi
+
+	if [ "$failures" ]; then
+		echo >&2 "$failures tests failed"
+	else
+		echo >&2 "SUCCESS!"
 	fi
 
 	exit ${failures:-0}
@@ -114,7 +121,7 @@ run() {
 	next_test_id=$((next_test_id + 1))
 	diag "------ TEST $next_test_id: $* ------"
 
-    "$@"
+	"$@"
 }
 
 ok() {
@@ -124,9 +131,9 @@ ok() {
 	if ( set -x; "$@" ) 2>&3; then
 		result=ok
 	else
-        result=fail
+		result=fail
 		failures=$((failures + 1))
-        printf "** TEST FAILED! **\n" >&3
+		printf "** TEST FAILED! **\n" >&3
 	fi
 
 	printf >&2 "%s - %s\n" $result "$*"
@@ -137,9 +144,9 @@ fail() {
 
 	printf >&3 "\n== !(%s) ==\n" "$*"
 	if ( set -x; "$@" ) 2>&3; then
-        result=fail
+		result=fail
 		failures=$((failures + 1))
-        printf "** TEST FAILED! **\n" >&3
+		printf "** TEST FAILED! **\n" >&3
 	else
 		result=ok
 	fi
@@ -177,7 +184,6 @@ test_links() {
 
 test_duplicates() {
 	diag <<-END
-	ok mkfile foo.jpeg >&4
 	We duplicate a file and verify that cathy removes it in favour of the
 	original copy, which is listed first to cathy's stdin.
 	END
