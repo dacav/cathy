@@ -43,10 +43,6 @@ reset() {
 	tmpdir="$(mktemp -d)"
 	filehier="$tmpdir/hier"
 	mkdir "$filehier"
-
-	# The file descriptor 4 is later used to feed cathy with the
-	# equivalent of a find hier -print0.
-	exec 4>"$tmpdir/input"
 }
 
 listout() {
@@ -156,14 +152,15 @@ fail() {
 
 cathy() (
 	cd "$tmpdir"
-	command cathy "$@" <./input
+	command cathy "$@"
 )
 
 test_links() {
-	ok mkfile foo.jpeg >&4
-	ok hardlink foo.jpeg >&4
-	ok softlink foo.jpeg >&4
-	ok cathy -r
+	{
+		ok mkfile foo.jpeg
+		ok hardlink foo.jpeg
+		ok softlink foo.jpeg
+	} | ok cathy -r
 
 	diag <<-END
 	All files exists, since they share the same inode, so no space
@@ -187,10 +184,14 @@ test_duplicates() {
 	We duplicate a file and verify that cathy removes it in favour of the
 	original copy, which is listed first to cathy's stdin.
 	END
-	ok mkfile foo.jpeg >&4
-	ok duplicate foo.jpeg >&4
+
+	{
+		ok mkfile foo.jpeg
+		ok duplicate foo.jpeg
+	} >"$tmpdir/input"
+
 	ok exists foo.jpeg.duplicate
-	ok cathy -r
+	ok cathy -r < "$tmpdir/input"
 	fail exists foo.jpeg.duplicate
 
 	diag <<-END
@@ -210,11 +211,13 @@ test_always_keep_the_oldest() {
 	copy, the original is removed, since it is newer than the copy, according
 	to its modification time (mtime).
 	END
-	ok mkfile foo.jpeg >&4
-	ok duplicate foo.jpeg >&4
+	{
+		ok mkfile foo.jpeg
+		ok duplicate foo.jpeg
+	} >"$tmpdir/input"
 	ok exists foo.jpeg.duplicate
 	ok change_mtime foo.jpeg
-	ok cathy -r
+	ok cathy -r <"$tmpdir/input"
 
 	diag<<-END
 	The foo.jpeg.duplicate file is hashed, while the original foo.jpeg
