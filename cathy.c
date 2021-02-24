@@ -74,6 +74,7 @@ void loop_entries(const FileRepo *filerepo, const OutDir *outdir)
         if (OutDir_link(outdir, &(OutDir_LinkInfo){
                 .hash = entry->filehash,
                 .path = entry->file->path,
+                .mtime = entry->file->mtime,
             })
         ) {
             warnx("failed to categorize file %s (filehash %s)",

@@ -5,17 +5,19 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
-#include <stddef.h>
 
 #include "util.h"
 
 struct OutDir {
     int hashdir;
+    int timedir;
 };
 
 enum {
@@ -28,6 +30,7 @@ void OutDir_del(OutDir *outdir)
         return;
 
     Util_fdclose(&outdir->hashdir);
+    Util_fdclose(&outdir->timedir);
     free(outdir);
 }
 
@@ -54,6 +57,7 @@ OutDir *OutDir_new(const char *path)
 
     *outdir = (OutDir){
         .hashdir = -1,
+        .timedir = -1,
     };
 
     if (OutDir_mkdir(AT_FDCWD, path) == -1)
@@ -65,9 +69,14 @@ OutDir *OutDir_new(const char *path)
 
     if (OutDir_mkdir(basedir, "by-hash") == -1)
         goto fail;
-
     outdir->hashdir = openat(basedir, "by-hash", O_DIRECTORY);
     if (outdir->hashdir == -1)
+        goto fail;
+
+    if (OutDir_mkdir(basedir, "by-time") == -1)
+        goto fail;
+    outdir->timedir = openat(basedir, "by-time", O_DIRECTORY);
+    if (outdir->timedir == -1)
         goto fail;
 
     Util_fdclose(&basedir);
@@ -111,6 +120,43 @@ int OutDir_hash_path(const OutDir *outdir,
     dirfd = openat(outdir->hashdir, buffer, O_DIRECTORY);
     if (dirfd == -1)
         warn("openat(%d, %s, O_DIRECTORY)", outdir->hashdir, buffer);
+    return dirfd;
+}
+
+static
+int OutDir_time_path(const OutDir *outdir,
+                     const OutDir_LinkInfo *linkinfo)
+{
+    char buffer[PATH_MAX];
+    int dirfd;
+    struct tm tm;
+
+    if (gmtime_r(&linkinfo->mtime, &tm) == NULL) {
+        warn("gmtime_r(&{%ld}, ...)", linkinfo->mtime);
+        return -1;
+    }
+
+    if (strftime(buffer, sizeof(buffer), "%Y/%m/%d", &tm) == 0) {
+        warnx("strftime failed");
+        return -1;
+    }
+
+    buffer[4] = '\0';
+    if (OutDir_mkdir(outdir->timedir, buffer))
+        return -1;
+    buffer[4] = '/';
+
+    buffer[7] = '\0';
+    if (OutDir_mkdir(outdir->timedir, buffer))
+        return -1;
+    buffer[7] = '/';
+
+    if (OutDir_mkdir(outdir->timedir, buffer))
+        return -1;
+
+    dirfd = openat(outdir->timedir, buffer, O_DIRECTORY);
+    if (dirfd == -1)
+        warn("openat(%d, %s, O_DIRECTORY)", outdir->timedir, buffer);
     return dirfd;
 }
 
@@ -180,7 +226,13 @@ int OutDir_link(const OutDir *outdir, const OutDir_LinkInfo *linkinfo)
     dirfd = OutDir_hash_path(outdir, linkinfo);
     if (dirfd == -1)
         goto exit;
+    if (OutDir_link_under(dirfd, linkinfo->path))
+        goto exit;
 
+    Util_fdclose(&dirfd);
+    dirfd = OutDir_time_path(outdir, linkinfo);
+    if (dirfd == -1)
+        goto exit;
     if (OutDir_link_under(dirfd, linkinfo->path))
         goto exit;
 
