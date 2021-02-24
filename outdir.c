@@ -80,26 +80,29 @@ fail:
 }
 
 static
-int OutDir_hash_path(const OutDir *outdir, const char *hash, const char *path)
+int OutDir_hash_path(const OutDir *outdir,
+                     const OutDir_LinkInfo *linkinfo)
 {
     char buffer[PATH_MAX];
     size_t hashlen;
     int dirfd;
 
-    hashlen = strlen(hash);
+    hashlen = strlen(linkinfo->hash);
     if (hashlen < OutDir_PREFIX || hashlen > sizeof(buffer) - 1) {
-        warnx("hash for '%s' has unexpected length, %zu bytes", path, hashlen);
+        warnx("hash for '%s' has unexpected length, %zu bytes",
+              linkinfo->path,
+              hashlen);
         return -1;
     }
 
-    memcpy(buffer, hash, OutDir_PREFIX);
+    memcpy(buffer, linkinfo->hash, OutDir_PREFIX);
     buffer[OutDir_PREFIX] = '\0';
     if (OutDir_mkdir(outdir->hashdir, buffer))
         return -1;
 
     buffer[OutDir_PREFIX] = '/';
     memcpy(buffer + OutDir_PREFIX + 1,
-           hash + OutDir_PREFIX,
+           linkinfo->hash + OutDir_PREFIX,
            hashlen - OutDir_PREFIX - 1);
     buffer[hashlen] = '\0';
     if (OutDir_mkdir(outdir->hashdir, buffer))
@@ -145,27 +148,43 @@ int OutDir_count_links(int dirfd)
     return result;
 }
 
-int OutDir_link(const OutDir *outdir, const OutDir_LinkInfo *linkinfo)
+static
+int OutDir_link_under(int dirfd, const char *target)
 {
-    int dirfd = -1,
-        ex = -1,
-        links_count;
+    int links_count;
     char linkname[11 /* enough for int */];
-
-    dirfd = OutDir_hash_path(outdir, linkinfo->hash, linkinfo->path);
-    if (dirfd == -1)
-        goto exit;
 
     links_count = OutDir_count_links(dirfd);
     if (links_count == -1)
+        return -1;
+
+    snprintf(
+        linkname,
+        sizeof(linkname),
+        "%.*d",
+        OutDir_PREFIX - 1,
+        links_count);
+
+    if (symlinkat(target, dirfd, linkname)) {
+        warn("symlinkat(%s, %d, %s)", target, dirfd, linkname);
+        return -1;
+    }
+
+    return 0;
+}
+
+int OutDir_link(const OutDir *outdir, const OutDir_LinkInfo *linkinfo)
+{
+    int dirfd = -1, ex = -1;
+
+    dirfd = OutDir_hash_path(outdir, linkinfo);
+    if (dirfd == -1)
         goto exit;
 
-    snprintf(linkname, sizeof(linkname),
-        "%.*d", OutDir_PREFIX - 1, links_count);
-    if (symlinkat(linkinfo->path, dirfd, linkname))
-        warn("symlinkat(%s, %d, %s)", linkinfo->path, dirfd, linkname);
-    else
-        ex = 0;
+    if (OutDir_link_under(dirfd, linkinfo->path))
+        goto exit;
+
+    ex = 0;
 exit:
     Util_fdclose(&dirfd);
     return ex;
