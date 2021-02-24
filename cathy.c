@@ -65,12 +65,14 @@ void parseopts(int argc, char **argv, Options *outopts)
 }
 
 static
-void loop_entries(const FileRepo *filerepo, const OutDir *outdir)
+void loop_entries(const FileRepo *filerepo,
+                  const OutDir *outdir,
+                  Counters *counters)
 {
     void *aux = NULL;
     const FileRepo_Entry *entry;
 
-    while (entry = FileRepo_iter(filerepo, &aux), entry != NULL)
+    while (entry = FileRepo_iter(filerepo, &aux), entry != NULL) {
         if (OutDir_link(outdir, &(OutDir_LinkInfo){
                 .hash = entry->filehash,
                 .path = entry->file->path,
@@ -80,7 +82,12 @@ void loop_entries(const FileRepo *filerepo, const OutDir *outdir)
             warnx("failed to categorize file %s (filehash %s)",
                 entry->file->path,
                 entry->filehash);
+            continue;
         }
+
+        counters->unique_files++;
+        counters->total_space += entry->file->size;
+    }
 }
 
 static
@@ -95,7 +102,7 @@ void loop_removals(const FileRepo *filerepo,
         warnx("%s file %s", remove_files ? "removing" : "would remove", file->path);
         if (remove_files)
             unlink(file->path);
-        counters->removed_files += 1;
+        counters->removed_files++;
         counters->freed_space += file->size;
     }
 }
@@ -140,7 +147,7 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    loop_entries(filerepo, outdir);
+    loop_entries(filerepo, outdir, &counters);
     loop_removals(filerepo, &counters, opts.remove_files);
 
     Counters_print(&counters, !opts.remove_files);

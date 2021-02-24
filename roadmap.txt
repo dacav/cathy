@@ -1,6 +1,3 @@
-- counters
- - individual files
- - total size
 - handle the case of re-scan of output directory
  - incremental mode
  - rescan mode
