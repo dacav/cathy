@@ -9,6 +9,7 @@ typedef struct Counters
     unsigned removed_files;
     unsigned ignored_links;
     unsigned collisions;
+    unsigned bad_timestamps;
 } Counters;
 
 void Counters_print(const Counters *counters, bool dry_run);

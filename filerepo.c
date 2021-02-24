@@ -109,15 +109,20 @@ int FileRepo_handle_duplicate(FileRepo *filerepo,
                               PFile *pfile,
                               PFile *duplicate)
 {
-    // We want to suggest the removal of one of the two duplicates.
-    // From the data perspective it doesn't matter which one, but the
-    // file modification time (mtime) might be different.
-    // If this is the case, we want to keep the oldest file, since the
-    // most recent copy is likely to be wrong (unless the clock was
-    // in the past for the host that made the copy.
+    if (duplicate->file.mtime != pfile->file.mtime) {
+        // We want to remove one of the two duplicates.
+        // From the data perspective it doesn't matter which one, but the
+        // file modification time (mtime) might be different.  If this is
+        // the case, we want to keep the oldest file, since the most
+        // recent copy is likely to be wrong (unless the clock was in the
+        // past for the host that made the copy.
+        if (duplicate->file.mtime < pfile->file.mtime)
+            File_objswap(&pfile->file, &duplicate->file);
 
-    if (duplicate->file.mtime < pfile->file.mtime)
-        File_objswap(&pfile->file, &duplicate->file);
+        // Regardless of which one we chose, the other has a bad
+        // timestamp.
+        filerepo->counters->bad_timestamps++;
+    }
 
     debug("Would remove duplicate: %s", duplicate->file.path);
     debug(" keep: %s (mtime=%ld)", pfile->file.path, pfile->file.mtime);

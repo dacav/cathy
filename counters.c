@@ -12,4 +12,5 @@ void Counters_print(const Counters *counters, bool dry_run)
     print(counters, freed_space, "%zu bytes");
     print(counters, ignored_links, "%u");
     print(counters, collisions, "%u");
+    print(counters, bad_timestamps, "%u");
 }
