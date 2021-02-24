@@ -21,7 +21,7 @@ struct OutDir {
 };
 
 enum {
-    OutDir_PREFIX = 5,
+    OutDir_PREFIX = 2,
 };
 
 void OutDir_del(OutDir *outdir)
