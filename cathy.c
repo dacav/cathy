@@ -71,10 +71,16 @@ void loop_entries(const FileRepo *filerepo, const OutDir *outdir)
     const FileRepo_Entry *entry;
 
     while (entry = FileRepo_iter(filerepo, &aux), entry != NULL)
-        if (OutDir_link(outdir, entry->filehash, entry->file->path))
+        if (OutDir_link(outdir, &(OutDir_LinkInfo){
+                .hash = entry->filehash,
+                .path = entry->file->path,
+                .mtime = entry->file->mtime,
+            })
+        ) {
             warnx("failed to categorize file %s (filehash %s)",
                 entry->file->path,
                 entry->filehash);
+        }
 }
 
 static
