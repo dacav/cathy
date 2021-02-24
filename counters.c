@@ -11,4 +11,5 @@ void Counters_print(const Counters *counters, bool dry_run)
     print(counters, removed_files, "%u");
     print(counters, freed_space, "%zu bytes");
     print(counters, ignored_links, "%u");
+    print(counters, collisions, "%u");
 }

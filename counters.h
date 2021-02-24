@@ -8,6 +8,7 @@ typedef struct Counters
     size_t freed_space;
     unsigned removed_files;
     unsigned ignored_links;
+    unsigned collisions;
 } Counters;
 
 void Counters_print(const Counters *counters, bool dry_run);
