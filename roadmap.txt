@@ -1,3 +1,8 @@
+- counters
+ - individual files
+ - total size
 - handle the case of re-scan of output directory
+ - incremental mode
+ - rescan mode
 - hierarchy by time, y/m/d
 - test (unlikely) file collision by using mocky cmp program
