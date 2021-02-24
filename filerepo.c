@@ -140,6 +140,7 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
             debug("ignoring %s as identical (same device/inode) to %s",
                 new_pfile->file.path,
                 pfile->file.path);
+            filerepo->counters->ignored_links++;
             PFile_del(new_pfile);
             return 0;
         }

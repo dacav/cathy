@@ -1,6 +1,4 @@
 - keep stats
- - ignored softlinks
- - ignored hardinks
  - number of effective hash collisions (not a copy, yet a collision)
  - number of copies with wrong dates
 
