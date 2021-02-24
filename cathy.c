@@ -103,7 +103,7 @@ int main(int argc, char **argv)
     OutDir *outdir = NULL;
     int fails = 0;
     const char *fname;
-    Counters counters;
+    Counters counters = {};
 
     parseopts(argc, argv, &opts);
 
