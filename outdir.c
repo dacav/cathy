@@ -145,14 +145,14 @@ int OutDir_count_links(int dirfd)
     return result;
 }
 
-int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
+int OutDir_link(const OutDir *outdir, const OutDir_LinkInfo *linkinfo)
 {
     int dirfd = -1,
         ex = -1,
         links_count;
     char linkname[11 /* enough for int */];
 
-    dirfd = OutDir_hash_path(outdir, hash, path);
+    dirfd = OutDir_hash_path(outdir, linkinfo->hash, linkinfo->path);
     if (dirfd == -1)
         goto exit;
 
@@ -162,8 +162,8 @@ int OutDir_link(const OutDir *outdir, const char *hash, const char *path)
 
     snprintf(linkname, sizeof(linkname),
         "%.*d", OutDir_PREFIX - 1, links_count);
-    if (symlinkat(path, dirfd, linkname))
-        warn("symlinkat(%s, %d, %s)", path, dirfd, linkname);
+    if (symlinkat(linkinfo->path, dirfd, linkname))
+        warn("symlinkat(%s, %d, %s)", linkinfo->path, dirfd, linkname);
     else
         ex = 0;
 exit:
