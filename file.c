@@ -13,7 +13,7 @@ void File_free(File *file)
 int File_init(File *file, const char *path)
 {
     struct stat statbuf;
-    const char *path_copy = NULL;
+    const char *abspath = NULL;
 
     if (stat(path, &statbuf) == -1) {
         warn("stat(%s, ...)", path);
@@ -30,14 +30,14 @@ int File_init(File *file, const char *path)
         goto fail;
     }
 
-    path_copy = strdup(path);
-    if (!path_copy) {
-        warn("strdup");
+    abspath = realpath(path, NULL);
+    if (!abspath) {
+        warn("realpath");
         goto fail;
     }
 
     *file = (File){
-        .path = path_copy,
+        .path = abspath,
         .mtime = statbuf.st_mtim.tv_sec
                + statbuf.st_mtim.tv_nsec / 1000000000,
         .device_id = statbuf.st_dev,
@@ -48,7 +48,7 @@ int File_init(File *file, const char *path)
     return 0;
 
 fail:
-    free((void *)path_copy);
+    free((void *)abspath);
     return -1;
 }
 
