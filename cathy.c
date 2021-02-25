@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
     parseopts(argc, argv, &opts);
 
-    events = Events_new();
+    events = Events_new(false);
     if (!events) {
         ++fails;
         goto exit;

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <err.h>
+#include <stdarg.h>
 
 #include "events.h"
 
@@ -15,35 +16,56 @@ struct Events {
         unsigned collisions;
         unsigned bad_timestamps;
     } counters;
+
+    bool verbose;
 };
+
+static
+void say(const Events *events, const char *fmt, ...)
+{
+    va_list ap;
+
+    if (!events->verbose)
+        return;
+
+    va_start(ap, fmt);
+    vwarnx(fmt, ap);
+    va_end(ap);
+}
 
 void Events_accept_file(Events *events, const File *file)
 {
+    say(events, "accept: " File_FMT, File_REPR(file));
     events->counters.unique_files++;
     events->counters.total_space += file->size;
 }
 
 void Events_reject_file(Events *events, const File *file)
 {
+    say(events, "reject: " File_FMT, File_REPR(file));
     events->counters.removed_files++;
     events->counters.freed_space += file->size;
 }
 
 void Events_duplicate(Events *events, const File *kept, const File *dropped)
 {
+    say(events, "duplicate: " File_FMT " replaces " File_FMT,
+        File_REPR(kept), File_REPR(dropped));
     if (kept->mtime != dropped->mtime)
         events->counters.bad_timestamps++;
 }
 
 void Events_ignored_identical(Events *events, const File *kept, const File *dropped)
 {
-    (void)kept;
-    (void)dropped;
+    say(events, "ignore: " File_FMT " is the same as " File_FMT,
+        File_REPR(kept), File_REPR(dropped));
     events->counters.ignored_links++;
 }
 
-void Events_collision(Events *events)
+void Events_collision(Events *events, const File *file, const char *hash)
 {
+    say(events, "collision: " File_FMT " having hash '%s'",
+        File_REPR(file), hash);
     events->counters.collisions++;
 }
 
@@ -67,7 +89,7 @@ void Events_del(Events *events)
     free(events);
 }
 
-Events *Events_new(void)
+Events *Events_new(bool verbose)
 {
     Events *events;
 
@@ -77,6 +99,8 @@ Events *Events_new(void)
         return NULL;
     }
 
-    *events = (Events){};
+    *events = (Events){
+        .verbose = verbose,
+    };
     return events;
 }

@@ -149,7 +149,7 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
             return FileRepo_handle_duplicate(filerepo, pfile, new_pfile);
     }
 
-    Events_collision(filerepo->events);
+    Events_collision(filerepo->events, &new_pfile->file, record->filehash);
     LL_PREPEND(record->unique_files, new_pfile);
     return 0;
 }
