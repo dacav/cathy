@@ -5,7 +5,7 @@
 #include <sysexits.h>
 #include <unistd.h>
 
-#include "counters.h"
+#include "events.h"
 #include "file.h"
 #include "filerepo.h"
 #include "hasher.h"
@@ -16,6 +16,7 @@ typedef struct {
     const char *cmpprg;
     const char *hashprg;
     const char *outdir;
+    const char *events_logfile;
     bool remove_files;
 } Options;
 
@@ -27,7 +28,7 @@ void usage(const char *prgname, int exval)
         " [-C comparer]"
         " [-H hasher]"
         " [-o outdir]"
-        " -r"
+        " [-rv]"
         "\n",
         prgname);
     exit(exval);
@@ -44,10 +45,13 @@ void parseopts(int argc, char **argv, Options *outopts)
         .outdir = ".",
     };
 
-    while (opt = getopt(argc, argv, "C:hH:o:r"), opt != -1) {
+    while (opt = getopt(argc, argv, "C:e:hH:o:r"), opt != -1) {
         switch (opt) {
         case 'C':
             outopts->cmpprg = optarg;
+            break;
+        case 'e':
+            outopts->events_logfile = optarg;
             break;
         case 'H':
             outopts->hashprg = optarg;
@@ -67,7 +71,7 @@ void parseopts(int argc, char **argv, Options *outopts)
 static
 void loop_entries(const FileRepo *filerepo,
                   const OutDir *outdir,
-                  Counters *counters)
+                  Events *events)
 {
     void *aux = NULL;
     const FileRepo_Entry *entry;
@@ -79,31 +83,28 @@ void loop_entries(const FileRepo *filerepo,
                 .mtime = entry->file->mtime,
             })
         ) {
-            warnx("failed to categorize file %s (filehash %s)",
+            warnx("failed to link file %s (filehash %s)",
                 entry->file->path,
                 entry->filehash);
             continue;
         }
 
-        counters->unique_files++;
-        counters->total_space += entry->file->size;
+        Events_accept_file(events, entry->file);
     }
 }
 
 static
 void loop_removals(const FileRepo *filerepo,
-                   Counters *counters,
+                   Events *events,
                    bool remove_files)
 {
     void *aux = NULL;
     const File *file;
 
     while (file = FileRepo_iter_removals(filerepo, &aux), file != NULL) {
-        warnx("%s file %s", remove_files ? "removing" : "would remove", file->path);
+        Events_reject_file(events, file);
         if (remove_files)
             unlink(file->path);
-        counters->removed_files++;
-        counters->freed_space += file->size;
     }
 }
 
@@ -116,9 +117,15 @@ int main(int argc, char **argv)
     OutDir *outdir = NULL;
     int fails = 0;
     const char *fname;
-    Counters counters = {};
+    Events *events = NULL;
 
     parseopts(argc, argv, &opts);
+
+    events = Events_new(opts.events_logfile);
+    if (!events) {
+        ++fails;
+        goto exit;
+    }
 
     hash = Hasher_new(opts.hashprg, opts.cmpprg);
     if (!hash) {
@@ -126,7 +133,7 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    filerepo = FileRepo_new(hash, &counters);
+    filerepo = FileRepo_new(hash, events);
     if (!filerepo) {
         ++fails;
         goto exit;
@@ -135,7 +142,7 @@ int main(int argc, char **argv)
     IORead_init(&ioread);
     while (fname = IORead_next(&ioread), fname != NULL)
         if (FileRepo_add(filerepo, fname)) {
-            warnx("failure while handling %s", fname);
+            Events_skipped_filename(events, fname);
             ++fails;
         }
     if (ioread.errno_s)
@@ -147,15 +154,16 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    loop_entries(filerepo, outdir, &counters);
-    loop_removals(filerepo, &counters, opts.remove_files);
+    loop_entries(filerepo, outdir, events);
+    loop_removals(filerepo, events, opts.remove_files);
 
-    Counters_print(&counters, !opts.remove_files);
+    Events_print_stats(events, !opts.remove_files);
 
 exit:
     OutDir_del(outdir);
     FileRepo_del(filerepo);
     Hasher_del(hash);
     IORead_free(&ioread);
+    Events_del(events);
     return fails ? EXIT_FAILURE : EXIT_SUCCESS;
 }

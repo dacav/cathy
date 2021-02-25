@@ -13,6 +13,9 @@ typedef struct File {
     off_t size;
 } File;
 
+#define File_FMT "File['%s', mtime=%ld size=%zu]"
+#define File_REPR(f) (f)->path, (f)->mtime, (f)->size
+
 int File_init(File *, const char *path);
 
 bool File_identical(File *, File *);
