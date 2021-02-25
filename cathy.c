@@ -5,7 +5,7 @@
 #include <sysexits.h>
 #include <unistd.h>
 
-#include "counters.h"
+#include "events.h"
 #include "file.h"
 #include "filerepo.h"
 #include "hasher.h"
@@ -67,7 +67,7 @@ void parseopts(int argc, char **argv, Options *outopts)
 static
 void loop_entries(const FileRepo *filerepo,
                   const OutDir *outdir,
-                  Counters *counters)
+                  Events *events)
 {
     void *aux = NULL;
     const FileRepo_Entry *entry;
@@ -85,14 +85,13 @@ void loop_entries(const FileRepo *filerepo,
             continue;
         }
 
-        counters->unique_files++;
-        counters->total_space += entry->file->size;
+        Events_accept_file(events, entry->file);
     }
 }
 
 static
 void loop_removals(const FileRepo *filerepo,
-                   Counters *counters,
+                   Events *events,
                    bool remove_files)
 {
     void *aux = NULL;
@@ -102,8 +101,7 @@ void loop_removals(const FileRepo *filerepo,
         warnx("%s file %s", remove_files ? "removing" : "would remove", file->path);
         if (remove_files)
             unlink(file->path);
-        counters->removed_files++;
-        counters->freed_space += file->size;
+        Events_reject_file(events, file);
     }
 }
 
@@ -116,9 +114,15 @@ int main(int argc, char **argv)
     OutDir *outdir = NULL;
     int fails = 0;
     const char *fname;
-    Counters counters = {};
+    Events *events = NULL;
 
     parseopts(argc, argv, &opts);
+
+    events = Events_new();
+    if (!events) {
+        ++fails;
+        goto exit;
+    }
 
     hash = Hasher_new(opts.hashprg, opts.cmpprg);
     if (!hash) {
@@ -126,7 +130,7 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    filerepo = FileRepo_new(hash, &counters);
+    filerepo = FileRepo_new(hash, events);
     if (!filerepo) {
         ++fails;
         goto exit;
@@ -147,15 +151,16 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    loop_entries(filerepo, outdir, &counters);
-    loop_removals(filerepo, &counters, opts.remove_files);
+    loop_entries(filerepo, outdir, events);
+    loop_removals(filerepo, events, opts.remove_files);
 
-    Counters_print(&counters, !opts.remove_files);
+    Events_print_stats(events, !opts.remove_files);
 
 exit:
     OutDir_del(outdir);
     FileRepo_del(filerepo);
     Hasher_del(hash);
     IORead_free(&ioread);
+    Events_del(events);
     return fails ? EXIT_FAILURE : EXIT_SUCCESS;
 }

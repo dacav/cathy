@@ -8,9 +8,7 @@
 #include <utlist.h>
 #include <string.h>
 
-#include "counters.h"
-
-#define debug(...) warnx(__VA_ARGS__)
+#include "events.h"
 
 typedef struct PFile {
     File file;
@@ -26,7 +24,7 @@ typedef struct {
 struct FileRepo {
     Record *records;
     const Hasher *hasher;
-    Counters *counters;
+    Events *events;
     PFile *removals;
 };
 
@@ -82,7 +80,7 @@ void Record_del(Record *record)
     free(record);
 }
 
-FileRepo *FileRepo_new(const Hasher *hasher, Counters *counters)
+FileRepo *FileRepo_new(const Hasher *hasher, Events *events)
 {
     FileRepo *filerepo;
 
@@ -94,7 +92,7 @@ FileRepo *FileRepo_new(const Hasher *hasher, Counters *counters)
 
     *filerepo = (FileRepo){
         .hasher = hasher,
-        .counters = counters,
+        .events = events,
     };
 
     return filerepo;
@@ -109,24 +107,16 @@ int FileRepo_handle_duplicate(FileRepo *filerepo,
                               PFile *pfile,
                               PFile *duplicate)
 {
-    if (duplicate->file.mtime != pfile->file.mtime) {
-        // We want to remove one of the two duplicates.
-        // From the data perspective it doesn't matter which one, but the
-        // file modification time (mtime) might be different.  If this is
-        // the case, we want to keep the oldest file, since the most
-        // recent copy is likely to be wrong (unless the clock was in the
-        // past for the host that made the copy.
-        if (duplicate->file.mtime < pfile->file.mtime)
-            File_objswap(&pfile->file, &duplicate->file);
+    // We want to remove one of the two duplicates.
+    // From the data perspective it doesn't matter which one, but the
+    // file modification time (mtime) might be different.  If this is
+    // the case, we want to keep the oldest file, since the most
+    // recent copy is likely to be wrong (unless the clock was in the
+    // past for the host that made the copy.
+    if (duplicate->file.mtime < pfile->file.mtime)
+        File_objswap(&pfile->file, &duplicate->file);
 
-        // Regardless of which one we chose, the other has a bad
-        // timestamp.
-        filerepo->counters->bad_timestamps++;
-    }
-
-    debug("Would remove duplicate: %s", duplicate->file.path);
-    debug(" keep: %s (mtime=%ld)", pfile->file.path, pfile->file.mtime);
-    debug(" drop: %s (mtime=%ld)", duplicate->file.path, duplicate->file.mtime);
+    Events_duplicate(filerepo->events, &pfile->file, &duplicate->file);
     LL_PREPEND(filerepo->removals, duplicate);
     return 0;
 }
@@ -142,10 +132,8 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
         bool is_copy;
 
         if (File_identical(&pfile->file, &new_pfile->file)) {
-            debug("ignoring %s as identical (same device/inode) to %s",
-                new_pfile->file.path,
-                pfile->file.path);
-            filerepo->counters->ignored_links++;
+            Events_ignored_identical(filerepo->events, &pfile->file,
+                &new_pfile->file);
             PFile_del(new_pfile);
             return 0;
         }
@@ -161,7 +149,7 @@ int FileRepo_attach_pfile(FileRepo *filerepo,
             return FileRepo_handle_duplicate(filerepo, pfile, new_pfile);
     }
 
-    filerepo->counters->collisions++;
+    Events_collision(filerepo->events);
     LL_PREPEND(record->unique_files, new_pfile);
     return 0;
 }

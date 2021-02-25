@@ -2,7 +2,7 @@ CFLAGS += -Wall -Werror -Wextra
 
 binaries := cathy
 
-cathy: cathy.o counters.o file.o filerepo.o hasher.o ioread.o outdir.o util.o
+cathy: cathy.o events.o file.o filerepo.o hasher.o ioread.o outdir.o util.o
 
 PATH := ${PWD}:${PATH}
 test: $(binaries)
