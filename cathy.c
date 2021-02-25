@@ -83,7 +83,7 @@ void loop_entries(const FileRepo *filerepo,
                 .mtime = entry->file->mtime,
             })
         ) {
-            warnx("failed to categorize file %s (filehash %s)",
+            warnx("failed to link file %s (filehash %s)",
                 entry->file->path,
                 entry->filehash);
             continue;
@@ -102,10 +102,9 @@ void loop_removals(const FileRepo *filerepo,
     const File *file;
 
     while (file = FileRepo_iter_removals(filerepo, &aux), file != NULL) {
-        warnx("%s file %s", remove_files ? "removing" : "would remove", file->path);
+        Events_reject_file(events, file);
         if (remove_files)
             unlink(file->path);
-        Events_reject_file(events, file);
     }
 }
 
