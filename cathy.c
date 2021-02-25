@@ -17,6 +17,7 @@ typedef struct {
     const char *hashprg;
     const char *outdir;
     bool remove_files;
+    bool verbose;
 } Options;
 
 static
@@ -27,7 +28,7 @@ void usage(const char *prgname, int exval)
         " [-C comparer]"
         " [-H hasher]"
         " [-o outdir]"
-        " -r"
+        " [-rv]"
         "\n",
         prgname);
     exit(exval);
@@ -44,7 +45,7 @@ void parseopts(int argc, char **argv, Options *outopts)
         .outdir = ".",
     };
 
-    while (opt = getopt(argc, argv, "C:hH:o:r"), opt != -1) {
+    while (opt = getopt(argc, argv, "C:hH:o:rv"), opt != -1) {
         switch (opt) {
         case 'C':
             outopts->cmpprg = optarg;
@@ -57,6 +58,9 @@ void parseopts(int argc, char **argv, Options *outopts)
             break;
         case 'r':
             outopts->remove_files = true;
+            break;
+        case 'v':
+            outopts->verbose = true;
             break;
         default:
             usage(argv[0], opt == 'h' ? 0 : EX_USAGE);
@@ -118,7 +122,7 @@ int main(int argc, char **argv)
 
     parseopts(argc, argv, &opts);
 
-    events = Events_new(false);
+    events = Events_new(opts.verbose);
     if (!events) {
         ++fails;
         goto exit;
