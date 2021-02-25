@@ -26,9 +26,10 @@ void usage(const char *prgname, int exval)
     fprintf(stderr,
         "usage: %s"
         " [-C comparer]"
+        " [-e events_log_file]"
         " [-H hasher]"
         " [-o outdir]"
-        " [-rv]"
+        " [-r]"
         "\n",
         prgname);
     exit(exval);
