@@ -16,8 +16,8 @@ typedef struct {
     const char *cmpprg;
     const char *hashprg;
     const char *outdir;
+    const char *events_logfile;
     bool remove_files;
-    bool verbose;
 } Options;
 
 static
@@ -45,10 +45,13 @@ void parseopts(int argc, char **argv, Options *outopts)
         .outdir = ".",
     };
 
-    while (opt = getopt(argc, argv, "C:hH:o:rv"), opt != -1) {
+    while (opt = getopt(argc, argv, "C:e:hH:o:r"), opt != -1) {
         switch (opt) {
         case 'C':
             outopts->cmpprg = optarg;
+            break;
+        case 'e':
+            outopts->events_logfile = optarg;
             break;
         case 'H':
             outopts->hashprg = optarg;
@@ -58,9 +61,6 @@ void parseopts(int argc, char **argv, Options *outopts)
             break;
         case 'r':
             outopts->remove_files = true;
-            break;
-        case 'v':
-            outopts->verbose = true;
             break;
         default:
             usage(argv[0], opt == 'h' ? 0 : EX_USAGE);
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 
     parseopts(argc, argv, &opts);
 
-    events = Events_new(opts.verbose);
+    events = Events_new(opts.events_logfile);
     if (!events) {
         ++fails;
         goto exit;

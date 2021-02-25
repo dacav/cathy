@@ -4,7 +4,7 @@
 
 typedef struct Events Events;
 
-Events *Events_new(bool verbose);
+Events *Events_new(const char *logfile);
 
 void Events_accept_file(Events *, const File *);
 void Events_reject_file(Events *, const File *);

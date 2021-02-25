@@ -2,9 +2,12 @@
 
 #include <stdlib.h>
 #include <err.h>
+#include <stdio.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #include "events.h"
+#include "util.h"
 
 struct Events {
     struct {
@@ -18,7 +21,7 @@ struct Events {
         unsigned skipped;
     } counters;
 
-    bool verbose;
+    FILE *logfile;
 };
 
 static
@@ -26,31 +29,31 @@ void say(const Events *events, const char *fmt, ...)
 {
     va_list ap;
 
-    if (!events->verbose)
+    if (!events->logfile)
         return;
 
     va_start(ap, fmt);
-    vwarnx(fmt, ap);
+    vfprintf(events->logfile, fmt, ap);
     va_end(ap);
 }
 
 void Events_accept_file(Events *events, const File *file)
 {
-    say(events, "accept: " File_FMT, File_REPR(file));
+    say(events, "Accept: " File_FMT "\n", File_REPR(file));
     events->counters.unique_files++;
     events->counters.total_space += file->size;
 }
 
 void Events_reject_file(Events *events, const File *file)
 {
-    say(events, "reject: " File_FMT, File_REPR(file));
+    say(events, "Reject: " File_FMT "\n", File_REPR(file));
     events->counters.removed_files++;
     events->counters.freed_space += file->size;
 }
 
 void Events_duplicate(Events *events, const File *kept, const File *dropped)
 {
-    say(events, "duplicate: " File_FMT " replaces " File_FMT,
+    say(events, "Duplicate: " File_FMT " replaces " File_FMT "\n",
         File_REPR(kept), File_REPR(dropped));
     if (kept->mtime != dropped->mtime)
         events->counters.bad_timestamps++;
@@ -58,20 +61,20 @@ void Events_duplicate(Events *events, const File *kept, const File *dropped)
 
 void Events_ignored_identical(Events *events, const File *kept, const File *dropped)
 {
-    say(events, "ignore: " File_FMT " is the same as " File_FMT,
+    say(events, "Ignore: " File_FMT " is the same as " File_FMT "\n",
         File_REPR(kept), File_REPR(dropped));
     events->counters.ignored_links++;
 }
 
 void Events_skipped_filename(Events *events, const char *fname)
 {
-    say(events, "skpped: '%s'", fname);
+    say(events, "Skpped: '%s'\n", fname);
     events->counters.skipped++;
 }
 
 void Events_collision(Events *events, const File *file, const char *hash)
 {
-    say(events, "collision: " File_FMT " having hash '%s'",
+    say(events, "Collision: " File_FMT " having hash '%s'\n",
         File_REPR(file), hash);
     events->counters.collisions++;
 }
@@ -94,21 +97,39 @@ void Events_print_stats(const Events *events, bool dry_run)
 
 void Events_del(Events *events)
 {
+    if (!events)
+        return;
+
+    if (events->logfile)
+        fclose(events->logfile);
     free(events);
 }
 
-Events *Events_new(bool verbose)
+Events *Events_new(const char *events_logfile)
 {
-    Events *events;
+    Events *events = NULL;
+    int logfd_dup = -1;
 
     events = malloc(sizeof(Events));
     if (!events) {
         warn("malloc");
-        return NULL;
+        goto fail;
     }
 
-    *events = (Events){
-        .verbose = verbose,
-    };
+    *events = (Events){};
+
+    if (events_logfile) {
+        events->logfile = fopen(events_logfile, "w");
+        if (!events->logfile) {
+            warn("fopen(%s, ...)", events_logfile);
+            goto fail;
+        }
+    }
+
     return events;
+
+fail:
+    Events_del(events);
+    Util_fdclose(&logfd_dup);
+    return NULL;
 }
