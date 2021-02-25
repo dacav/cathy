@@ -53,9 +53,15 @@ void Events_reject_file(Events *events, const File *file)
 
 void Events_duplicate(Events *events, const File *kept, const File *dropped)
 {
-    say(events, "Duplicate: " File_FMT " replaces " File_FMT "\n",
-        File_REPR(kept), File_REPR(dropped));
-    if (kept->mtime != dropped->mtime)
+    bool bad_timestamp;
+
+    bad_timestamp = kept->mtime != dropped->mtime;
+
+    say(events, "Duplicate: " File_FMT " replaces " File_FMT "%s\n",
+        File_REPR(kept), File_REPR(dropped),
+        bad_timestamp ? " (bad timestamp)" : "");
+
+    if (bad_timestamp)
         events->counters.bad_timestamps++;
 }
 

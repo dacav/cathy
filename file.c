@@ -27,6 +27,8 @@ int File_init(File *file, const char *path)
 
     default:
         warnx("Skip '%s': not a (regular) file or softlink", path);
+    case S_IFDIR:
+        // directories are common, no need to log it.
         goto fail;
     }
 
