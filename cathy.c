@@ -143,7 +143,7 @@ int main(int argc, char **argv)
     IORead_init(&ioread);
     while (fname = IORead_next(&ioread), fname != NULL)
         if (FileRepo_add(filerepo, fname)) {
-            warnx("failure while handling %s", fname);
+            Events_skipped_filename(events, fname);
             ++fails;
         }
     if (ioread.errno_s)

@@ -15,6 +15,7 @@ struct Events {
         unsigned ignored_links;
         unsigned collisions;
         unsigned bad_timestamps;
+        unsigned skipped;
     } counters;
 
     bool verbose;
@@ -62,6 +63,12 @@ void Events_ignored_identical(Events *events, const File *kept, const File *drop
     events->counters.ignored_links++;
 }
 
+void Events_skipped_filename(Events *events, const char *fname)
+{
+    say(events, "skpped: '%s'", fname);
+    events->counters.skipped++;
+}
+
 void Events_collision(Events *events, const File *file, const char *hash)
 {
     say(events, "collision: " File_FMT " having hash '%s'",
@@ -81,6 +88,7 @@ void Events_print_stats(const Events *events, bool dry_run)
     print(events, ignored_links, "%u");
     print(events, collisions, "%u");
     print(events, bad_timestamps, "%u");
+    print(events, skipped, "%u");
 }
 #undef print
 
